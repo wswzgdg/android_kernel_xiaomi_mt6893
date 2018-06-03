@@ -230,7 +230,6 @@ BPF_CALL_0(bpf_get_current_cgroup_id)
 
 	return cgrp->kn->id.id;
 }
-
 const struct bpf_func_proto bpf_get_current_cgroup_id_proto = {
 	.func		= bpf_get_current_cgroup_id,
 	.gpl_only	= false,
