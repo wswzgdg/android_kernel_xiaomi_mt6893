@@ -254,7 +254,6 @@ BPF_CALL_2(bpf_get_local_storage, struct bpf_map *, map, u64, flags)
 
 	return (unsigned long)&READ_ONCE(storage->buf)->data[0];
 }
-
 const struct bpf_func_proto bpf_get_local_storage_proto = {
 	.func		= bpf_get_local_storage,
 	.gpl_only	= false,
