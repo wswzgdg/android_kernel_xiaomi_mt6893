@@ -1592,7 +1592,7 @@ bool bpf_prog_array_is_empty(struct bpf_prog_array __rcu *array)
 void bpf_prog_array_delete_safe(struct bpf_prog_array __rcu *progs,
 				struct bpf_prog *old_prog)
 {
-	struct bpf_prog_array_item *item = progs->items;
+	struct bpf_prog_array_item *item = array->items;
 
 	for (; item->prog; item++)
 		if (item->prog == old_prog) {
@@ -1648,27 +1648,27 @@ int bpf_prog_array_copy(struct bpf_prog_array __rcu *old_array,
 	return 0;
 }
 
-int bpf_prog_array_length(struct bpf_prog_array __rcu *progs)
+int bpf_prog_array_length(struct bpf_prog_array __rcu *array)
 {
 	struct bpf_prog_array_item *item;
 	u32 cnt = 0;
 
 	rcu_read_lock();
-	item = &rcu_dereference(progs)->items[0];
+	item = &rcu_dereference(array)->items[0];
 	for (; item->prog; item++)
 		cnt++;
 	rcu_read_unlock();
 	return cnt;
 }
 
-int bpf_prog_array_copy_to_user(struct bpf_prog_array __rcu *progs,
+int bpf_prog_array_copy_to_user(struct bpf_prog_array __rcu *array,
 				__u32 __user *prog_ids, u32 cnt)
 {
 	struct bpf_prog_array_item *item;
 	u32 i = 0, id;
 
 	rcu_read_lock();
-	item = &rcu_dereference(progs)->items[0];
+	item = &rcu_dereference(array)->items[0];
 	for (; item->prog; item++) {
 		id = item->prog->aux->id;
 		if (copy_to_user(prog_ids + i, &id, sizeof(id))) {
