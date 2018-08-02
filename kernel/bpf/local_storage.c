@@ -7,9 +7,6 @@
 #include <linux/rbtree.h>
 #include <linux/slab.h>
 
-DEFINE_PER_CPU(struct bpf_cgroup_storage*,
-	       bpf_cgroup_storage[MAX_BPF_CGROUP_STORAGE_TYPE]);
-
 #ifdef CONFIG_CGROUP_BPF
 
 #define LOCAL_STORAGE_CREATE_FLAG_MASK					\
@@ -247,12 +244,10 @@ const struct bpf_map_ops cgroup_storage_map_ops = {
 	.map_lookup_elem = cgroup_storage_lookup_elem,
 	.map_update_elem = cgroup_storage_update_elem,
 	.map_delete_elem = cgroup_storage_delete_elem,
-	.map_check_btf = map_check_no_btf,
 };
 
 int bpf_cgroup_storage_assign(struct bpf_prog *prog, struct bpf_map *_map)
 {
-	enum bpf_cgroup_storage_type stype = cgroup_storage_type(_map);
 	struct bpf_cgroup_storage_map *map = map_to_storage(_map);
 	int ret = -EBUSY;
 
@@ -260,12 +255,11 @@ int bpf_cgroup_storage_assign(struct bpf_prog *prog, struct bpf_map *_map)
 
 	if (map->prog && map->prog != prog)
 		goto unlock;
-	if (prog->aux->cgroup_storage[stype] &&
-	    prog->aux->cgroup_storage[stype] != _map)
+	if (prog->aux->cgroup_storage && prog->aux->cgroup_storage != _map)
 		goto unlock;
 
 	map->prog = prog;
-	prog->aux->cgroup_storage[stype] = _map;
+	prog->aux->cgroup_storage = _map;
 	ret = 0;
 unlock:
 	spin_unlock_bh(&map->lock);
@@ -275,26 +269,24 @@ unlock:
 
 void bpf_cgroup_storage_release(struct bpf_prog *prog, struct bpf_map *_map)
 {
-	enum bpf_cgroup_storage_type stype = cgroup_storage_type(_map);
 	struct bpf_cgroup_storage_map *map = map_to_storage(_map);
 
 	spin_lock_bh(&map->lock);
 	if (map->prog == prog) {
-		WARN_ON(prog->aux->cgroup_storage[stype] != _map);
+		WARN_ON(prog->aux->cgroup_storage != _map);
 		map->prog = NULL;
-		prog->aux->cgroup_storage[stype] = NULL;
+		prog->aux->cgroup_storage = NULL;
 	}
 	spin_unlock_bh(&map->lock);
 }
 
-struct bpf_cgroup_storage *bpf_cgroup_storage_alloc(struct bpf_prog *prog,
-					enum bpf_cgroup_storage_type stype)
+struct bpf_cgroup_storage *bpf_cgroup_storage_alloc(struct bpf_prog *prog)
 {
 	struct bpf_cgroup_storage *storage;
 	struct bpf_map *map;
 	u32 pages;
 
-	map = prog->aux->cgroup_storage[stype];
+	map = prog->aux->cgroup_storage;
 	if (!map)
 		return NULL;
 
