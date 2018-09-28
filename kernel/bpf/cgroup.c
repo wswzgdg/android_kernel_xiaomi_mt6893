@@ -371,7 +371,7 @@ int __cgroup_bpf_detach(struct cgroup *cgrp, struct bpf_prog *prog,
 {
 	struct list_head *progs = &cgrp->bpf.progs[type];
 	enum bpf_cgroup_storage_type stype;
-	flags = cgrp->bpf.flags[type];
+	u32 flags = cgrp->bpf.flags[type];
 	struct bpf_prog *old_prog = NULL;
 	struct bpf_prog_list *pl;
 	int err;
