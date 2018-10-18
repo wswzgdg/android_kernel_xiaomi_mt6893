@@ -45,3 +45,5 @@ BPF_MAP_TYPE(BPF_MAP_TYPE_DEVMAP_HASH, dev_map_hash_ops)
 BPF_MAP_TYPE(BPF_MAP_TYPE_SOCKMAP, sock_map_ops)
 #endif
 #endif
+BPF_MAP_TYPE(BPF_MAP_TYPE_QUEUE, queue_map_ops)
+BPF_MAP_TYPE(BPF_MAP_TYPE_STACK, stack_map_ops)

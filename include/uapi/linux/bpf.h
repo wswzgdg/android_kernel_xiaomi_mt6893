@@ -115,6 +115,8 @@ enum bpf_map_type {
 	BPF_MAP_TYPE_DEVMAP,
 	BPF_MAP_TYPE_SOCKMAP,
 	BPF_MAP_TYPE_DEVMAP_HASH = 25,
+	BPF_MAP_TYPE_QUEUE,
+	BPF_MAP_TYPE_STACK,
 };
 
 enum bpf_prog_type {
