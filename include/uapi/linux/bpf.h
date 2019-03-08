@@ -1406,7 +1406,6 @@ union bpf_attr {
 	FN(skc_lookup_tcp),		\
 	FN(tcp_check_syncookie),	\
 	FN(sysctl_get_name),		\
-<<<<<<< HEAD
 	FN(sysctl_get_current_value),	\
 	FN(sysctl_get_new_value),	\
 	FN(sysctl_set_new_value),	\
@@ -1432,7 +1431,6 @@ union bpf_attr {
 	FN(sk_assign),			\
 	FN(ktime_get_boot_ns),
 	FN(sysctl_get_name),
-=======
 	FN(sysctl_get_current_value),
 >>>>>>> 1d11b3016cec (bpf: Introduce bpf_sysctl_get_current_value helper)
 
