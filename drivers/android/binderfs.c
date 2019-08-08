@@ -772,6 +772,7 @@ static int binderfs_fill_super(struct super_block *sb, void *data, int silent)
 			name++;
 	}
 
+<<<<<<< HEAD
 	ret = init_binder_features(sb);
 	if (ret)
 		return ret;
@@ -779,6 +780,8 @@ static int binderfs_fill_super(struct super_block *sb, void *data, int silent)
 	if (info->mount_opts.stats_mode == STATS_GLOBAL)
 		return init_binder_logs(sb);
 
+=======
+>>>>>>> e8fb3933b6d5 (UPSTREAM: binder: Add default binder devices through binderfs when configured)
 	return 0;
 }
 
