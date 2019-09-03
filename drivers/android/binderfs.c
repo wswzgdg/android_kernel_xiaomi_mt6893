@@ -48,6 +48,19 @@ static dev_t binderfs_dev;
 static DEFINE_MUTEX(binderfs_minors_mutex);
 static DEFINE_IDA(binderfs_minors);
 
+<<<<<<< HEAD
+=======
+/**
+ * binderfs_mount_opts - mount options for binderfs
+ * @max: maximum number of allocatable binderfs binder devices
+ * @stats_mode: enable binder stats in binderfs.
+ */
+struct binderfs_mount_opts {
+	int max;
+	int stats_mode;
+};
+
+>>>>>>> 4d96097431b9 (UPSTREAM: binder: add a mount option to show global stats)
 enum {
 	Opt_max,
 	Opt_stats_mode,
@@ -59,11 +72,14 @@ enum binderfs_stats_mode {
 	STATS_GLOBAL,
 };
 
+<<<<<<< HEAD
 struct binder_features {
 	bool oneway_spam_detection;
 	bool extended_error;
 };
 
+=======
+>>>>>>> 4d96097431b9 (UPSTREAM: binder: add a mount option to show global stats)
 static const match_table_t tokens = {
 	{ Opt_max, "max=%d" },
 	{ Opt_stats_mode, "stats=%s" },
