@@ -70,11 +70,14 @@ static const match_table_t tokens = {
 	{ Opt_err, NULL     }
 };
 
+<<<<<<< HEAD
 static struct binder_features binder_features = {
 	.oneway_spam_detection = true,
 	.extended_error = true,
 };
 
+=======
+>>>>>>> 1405bf2e0f82 (UPSTREAM: binder: Add binder_proc logging to binderfs)
 static inline struct binderfs_info *BINDERFS_I(const struct inode *inode)
 {
 	return inode->i_sb->s_fs_info;
@@ -533,10 +536,13 @@ void binderfs_remove_file(struct dentry *dentry)
 struct dentry *binderfs_create_file(struct dentry *parent, const char *name,
 				    const struct file_operations *fops,
 				    void *data)
+<<<<<<< HEAD
 static struct dentry *binderfs_create_file(struct dentry *parent,
 					   const char *name,
 					   const struct file_operations *fops,
 					   void *data)
+=======
+>>>>>>> 1405bf2e0f82 (UPSTREAM: binder: Add binder_proc logging to binderfs)
 {
 	struct dentry *dentry;
 	struct inode *new_inode, *parent_inode;
@@ -641,7 +647,8 @@ static int init_binder_logs(struct super_block *sb)
 	struct binderfs_info *info;
 static int init_binder_logs(struct super_block *sb)
 {
-	struct dentry *binder_logs_root_dir, *dentry;
+	struct dentry *binder_logs_root_dir, *dentry, *proc_log_dir;
+	struct binderfs_info *info;
 	int ret = 0;
 
 	binder_logs_root_dir = binderfs_create_dir(sb->s_root,
@@ -686,6 +693,7 @@ static int init_binder_logs(struct super_block *sb)
 				      &binder_transaction_log_fops,
 				      &binder_transaction_log_failed);
 	if (IS_ERR(dentry)) {
+<<<<<<< HEAD
 		ret = PTR_ERR(dentry);
 		goto out;
 	}
@@ -698,7 +706,19 @@ static int init_binder_logs(struct super_block *sb)
 	info = sb->s_fs_info;
 	info->proc_log_dir = proc_log_dir;
 	if (IS_ERR(dentry))
+=======
+>>>>>>> 1405bf2e0f82 (UPSTREAM: binder: Add binder_proc logging to binderfs)
 		ret = PTR_ERR(dentry);
+		goto out;
+	}
+
+	proc_log_dir = binderfs_create_dir(binder_logs_root_dir, "proc");
+	if (IS_ERR(proc_log_dir)) {
+		ret = PTR_ERR(proc_log_dir);
+		goto out;
+	}
+	info = sb->s_fs_info;
+	info->proc_log_dir = proc_log_dir;
 
 out:
 	return ret;
