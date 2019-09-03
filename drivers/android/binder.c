@@ -7010,6 +7010,7 @@ static int __init binder_init(void)
 				    binder_debugfs_dir_entry_root,
 				    &binder_transaction_log_failed,
 				    &binder_transaction_log_fops);
+<<<<<<< HEAD
 #ifdef BINDER_WATCHDOG
 		debugfs_create_file("timeout_log",
 				    0444,
@@ -7017,6 +7018,8 @@ static int __init binder_init(void)
 				    NULL,
 				    &binder_timeout_log_fops);
 #endif
+=======
+>>>>>>> 3741393c2db1 (UPSTREAM: binder: Make transaction_log available in binderfs)
 	}
 
 	if (!IS_ENABLED(CONFIG_ANDROID_BINDERFS) &&
