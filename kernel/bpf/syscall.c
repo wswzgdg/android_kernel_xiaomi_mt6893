@@ -1932,6 +1932,433 @@ static int bpf_btf_load(const union bpf_attr *attr)
 	return btf_new_fd(attr);
 }
 
+#define BPF_BTF_GET_FD_BY_ID_LAST_FIELD btf_id
+
+static int bpf_btf_get_fd_by_id(const union bpf_attr *attr)
+{
+	if (CHECK_ATTR(BPF_BTF_GET_FD_BY_ID))
+		return -EINVAL;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	return btf_get_fd_by_id(attr->btf_id);
+}
+
+static int bpf_task_fd_query_copy(const union bpf_attr *attr,
+				    union bpf_attr __user *uattr,
+				    u32 prog_id, u32 fd_type,
+				    const char *buf, u64 probe_offset,
+				    u64 probe_addr)
+{
+	char __user *ubuf = u64_to_user_ptr(attr->task_fd_query.buf);
+	u32 len = buf ? strlen(buf) : 0, input_len;
+	int err = 0;
+
+	if (put_user(len, &uattr->task_fd_query.buf_len))
+		return -EFAULT;
+	input_len = attr->task_fd_query.buf_len;
+	if (input_len && ubuf) {
+		if (!len) {
+			/* nothing to copy, just make ubuf NULL terminated */
+			char zero = '\0';
+
+			if (put_user(zero, ubuf))
+				return -EFAULT;
+		} else if (input_len >= len + 1) {
+			/* ubuf can hold the string with NULL terminator */
+			if (copy_to_user(ubuf, buf, len + 1))
+				return -EFAULT;
+		} else {
+			/* ubuf cannot hold the string with NULL terminator,
+			 * do a partial copy with NULL terminator.
+			 */
+			char zero = '\0';
+
+			err = -ENOSPC;
+			if (copy_to_user(ubuf, buf, input_len - 1))
+				return -EFAULT;
+			if (put_user(zero, ubuf + input_len - 1))
+				return -EFAULT;
+		}
+	}
+
+	if (put_user(prog_id, &uattr->task_fd_query.prog_id) ||
+	    put_user(fd_type, &uattr->task_fd_query.fd_type) ||
+	    put_user(probe_offset, &uattr->task_fd_query.probe_offset) ||
+	    put_user(probe_addr, &uattr->task_fd_query.probe_addr))
+		return -EFAULT;
+
+	return err;
+}
+
+#define BPF_TASK_FD_QUERY_LAST_FIELD task_fd_query.probe_addr
+
+static int bpf_task_fd_query(const union bpf_attr *attr,
+			     union bpf_attr __user *uattr)
+{
+	pid_t pid = attr->task_fd_query.pid;
+	u32 fd = attr->task_fd_query.fd;
+	const struct perf_event *event;
+	struct files_struct *files;
+	struct task_struct *task;
+	struct file *file;
+	int err;
+
+	if (CHECK_ATTR(BPF_TASK_FD_QUERY))
+		return -EINVAL;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (attr->task_fd_query.flags != 0)
+		return -EINVAL;
+
+	task = get_pid_task(find_vpid(pid), PIDTYPE_PID);
+	if (!task)
+		return -ENOENT;
+
+	files = get_files_struct(task);
+	put_task_struct(task);
+	if (!files)
+		return -ENOENT;
+
+	err = 0;
+	spin_lock(&files->file_lock);
+	file = fcheck_files(files, fd);
+	if (!file)
+		err = -EBADF;
+	else
+		get_file(file);
+	spin_unlock(&files->file_lock);
+	put_files_struct(files);
+
+	if (err)
+		goto out;
+
+	if (file->f_op == &bpf_link_fops) {
+		struct bpf_link *link = file->private_data;
+
+		if (link->ops == &bpf_raw_tp_link_lops) {
+			struct bpf_raw_tp_link *raw_tp =
+				container_of(link, struct bpf_raw_tp_link, link);
+			struct bpf_raw_event_map *btp = raw_tp->btp;
+
+			err = bpf_task_fd_query_copy(attr, uattr,
+						     raw_tp->link.prog->aux->id,
+						     BPF_FD_TYPE_RAW_TRACEPOINT,
+						     btp->tp->name, 0, 0);
+			goto put_file;
+		}
+		goto out_not_supp;
+	}
+
+	event = perf_get_event(file);
+	if (!IS_ERR(event)) {
+		u64 probe_offset, probe_addr;
+		u32 prog_id, fd_type;
+		const char *buf;
+
+		err = bpf_get_perf_event_info(event, &prog_id, &fd_type,
+					      &buf, &probe_offset,
+					      &probe_addr);
+		if (!err)
+			err = bpf_task_fd_query_copy(attr, uattr, prog_id,
+						     fd_type, buf,
+						     probe_offset,
+						     probe_addr);
+		goto put_file;
+	}
+
+out_not_supp:
+	err = -ENOTSUPP;
+put_file:
+	fput(file);
+out:
+	return err;
+}
+
+#define BPF_MAP_BATCH_LAST_FIELD batch.flags
+
+#define BPF_DO_BATCH(fn)			\
+	do {					\
+		if (!fn) {			\
+			err = -ENOTSUPP;	\
+			goto err_put;		\
+		}				\
+		err = fn(map, attr, uattr);	\
+	} while (0)
+
+static int bpf_map_do_batch(const union bpf_attr *attr,
+			    union bpf_attr __user *uattr,
+			    int cmd)
+{
+	struct bpf_map *map;
+	int err, ufd;
+	struct fd f;
+
+	if (CHECK_ATTR(BPF_MAP_BATCH))
+		return -EINVAL;
+
+	ufd = attr->batch.map_fd;
+	f = fdget(ufd);
+	map = __bpf_map_get(f);
+	if (IS_ERR(map))
+		return PTR_ERR(map);
+
+	if ((cmd == BPF_MAP_LOOKUP_BATCH ||
+	     cmd == BPF_MAP_LOOKUP_AND_DELETE_BATCH) &&
+	    !(map_get_sys_perms(map, f) & FMODE_CAN_READ)) {
+		err = -EPERM;
+		goto err_put;
+	}
+
+	if (cmd != BPF_MAP_LOOKUP_BATCH &&
+	    !(map_get_sys_perms(map, f) & FMODE_CAN_WRITE)) {
+		err = -EPERM;
+		goto err_put;
+	}
+
+	if (cmd == BPF_MAP_LOOKUP_BATCH)
+		BPF_DO_BATCH(map->ops->map_lookup_batch);
+	else if (cmd == BPF_MAP_LOOKUP_AND_DELETE_BATCH)
+		BPF_DO_BATCH(map->ops->map_lookup_and_delete_batch);
+	else if (cmd == BPF_MAP_UPDATE_BATCH)
+		BPF_DO_BATCH(map->ops->map_update_batch);
+	else
+		BPF_DO_BATCH(map->ops->map_delete_batch);
+
+err_put:
+	fdput(f);
+	return err;
+}
+
+static int tracing_bpf_link_attach(const union bpf_attr *attr, struct bpf_prog *prog)
+{
+	if (attr->link_create.attach_type == BPF_TRACE_ITER &&
+	    prog->expected_attach_type == BPF_TRACE_ITER)
+		return bpf_iter_link_attach(attr, prog);
+
+	return -EINVAL;
+}
+
+#define BPF_LINK_CREATE_LAST_FIELD link_create.flags
+static int link_create(union bpf_attr *attr)
+{
+	enum bpf_prog_type ptype;
+	struct bpf_prog *prog;
+	int ret;
+
+	if (CHECK_ATTR(BPF_LINK_CREATE))
+		return -EINVAL;
+
+	ptype = attach_type_to_prog_type(attr->link_create.attach_type);
+	if (ptype == BPF_PROG_TYPE_UNSPEC)
+		return -EINVAL;
+
+	prog = bpf_prog_get_type(attr->link_create.prog_fd, ptype);
+	if (IS_ERR(prog))
+		return PTR_ERR(prog);
+
+	ret = bpf_prog_attach_check_attach_type(prog,
+						attr->link_create.attach_type);
+	if (ret)
+		goto err_out;
+
+	switch (ptype) {
+	case BPF_PROG_TYPE_CGROUP_SKB:
+	case BPF_PROG_TYPE_CGROUP_SOCK:
+	case BPF_PROG_TYPE_CGROUP_SOCK_ADDR:
+	case BPF_PROG_TYPE_SOCK_OPS:
+	case BPF_PROG_TYPE_CGROUP_DEVICE:
+	case BPF_PROG_TYPE_CGROUP_SYSCTL:
+	case BPF_PROG_TYPE_CGROUP_SOCKOPT:
+		ret = cgroup_bpf_link_attach(attr, prog);
+		break;
+	case BPF_PROG_TYPE_TRACING:
+		ret = tracing_bpf_link_attach(attr, prog);
+		break;
+	default:
+		ret = -EINVAL;
+	}
+
+err_out:
+	if (ret < 0)
+		bpf_prog_put(prog);
+	return ret;
+}
+
+#define BPF_LINK_UPDATE_LAST_FIELD link_update.old_prog_fd
+
+static int link_update(union bpf_attr *attr)
+{
+	struct bpf_prog *old_prog = NULL, *new_prog;
+	struct bpf_link *link;
+	u32 flags;
+	int ret;
+
+	if (CHECK_ATTR(BPF_LINK_UPDATE))
+		return -EINVAL;
+
+	flags = attr->link_update.flags;
+	if (flags & ~BPF_F_REPLACE)
+		return -EINVAL;
+
+	link = bpf_link_get_from_fd(attr->link_update.link_fd);
+	if (IS_ERR(link))
+		return PTR_ERR(link);
+
+	new_prog = bpf_prog_get(attr->link_update.new_prog_fd);
+	if (IS_ERR(new_prog)) {
+		ret = PTR_ERR(new_prog);
+		goto out_put_link;
+	}
+
+	if (flags & BPF_F_REPLACE) {
+		old_prog = bpf_prog_get(attr->link_update.old_prog_fd);
+		if (IS_ERR(old_prog)) {
+			ret = PTR_ERR(old_prog);
+			old_prog = NULL;
+			goto out_put_progs;
+		}
+	} else if (attr->link_update.old_prog_fd) {
+		ret = -EINVAL;
+		goto out_put_progs;
+	}
+
+	if (link->ops->update_prog)
+		ret = link->ops->update_prog(link, new_prog, old_prog);
+	else
+		ret = -EINVAL;
+
+out_put_progs:
+	if (old_prog)
+		bpf_prog_put(old_prog);
+	if (ret)
+		bpf_prog_put(new_prog);
+out_put_link:
+	bpf_link_put(link);
+	return ret;
+}
+
+static int bpf_link_inc_not_zero(struct bpf_link *link)
+{
+	return atomic64_fetch_add_unless(&link->refcnt, 1, 0) ? 0 : -ENOENT;
+}
+
+#define BPF_LINK_GET_FD_BY_ID_LAST_FIELD link_id
+
+static int bpf_link_get_fd_by_id(const union bpf_attr *attr)
+{
+	struct bpf_link *link;
+	u32 id = attr->link_id;
+	int fd, err;
+
+	if (CHECK_ATTR(BPF_LINK_GET_FD_BY_ID))
+		return -EINVAL;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	spin_lock_bh(&link_idr_lock);
+	link = idr_find(&link_idr, id);
+	/* before link is "settled", ID is 0, pretend it doesn't exist yet */
+	if (link) {
+		if (link->id)
+			err = bpf_link_inc_not_zero(link);
+		else
+			err = -EAGAIN;
+	} else {
+		err = -ENOENT;
+	}
+	spin_unlock_bh(&link_idr_lock);
+
+	if (err)
+		return err;
+
+	fd = bpf_link_new_fd(link);
+	if (fd < 0)
+		bpf_link_put(link);
+
+	return fd;
+}
+
+DEFINE_MUTEX(bpf_stats_enabled_mutex);
+
+static int bpf_stats_release(struct inode *inode, struct file *file)
+{
+	mutex_lock(&bpf_stats_enabled_mutex);
+	static_key_slow_dec(&bpf_stats_enabled_key.key);
+	mutex_unlock(&bpf_stats_enabled_mutex);
+	return 0;
+}
+
+static const struct file_operations bpf_stats_fops = {
+	.release = bpf_stats_release,
+};
+
+static int bpf_enable_runtime_stats(void)
+{
+	int fd;
+
+	mutex_lock(&bpf_stats_enabled_mutex);
+
+	/* Set a very high limit to avoid overflow */
+	if (static_key_count(&bpf_stats_enabled_key.key) > INT_MAX / 2) {
+		mutex_unlock(&bpf_stats_enabled_mutex);
+		return -EBUSY;
+	}
+
+	fd = anon_inode_getfd("bpf-stats", &bpf_stats_fops, NULL, O_CLOEXEC);
+	if (fd >= 0)
+		static_key_slow_inc(&bpf_stats_enabled_key.key);
+
+	mutex_unlock(&bpf_stats_enabled_mutex);
+	return fd;
+}
+
+#define BPF_ENABLE_STATS_LAST_FIELD enable_stats.type
+
+static int bpf_enable_stats(union bpf_attr *attr)
+{
+
+	if (CHECK_ATTR(BPF_ENABLE_STATS))
+		return -EINVAL;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	switch (attr->enable_stats.type) {
+	case BPF_STATS_RUN_TIME:
+		return bpf_enable_runtime_stats();
+	default:
+		break;
+	}
+	return -EINVAL;
+}
+
+#define BPF_ITER_CREATE_LAST_FIELD iter_create.flags
+
+static int bpf_iter_create(union bpf_attr *attr)
+{
+	struct bpf_link *link;
+	int err;
+
+	if (CHECK_ATTR(BPF_ITER_CREATE))
+		return -EINVAL;
+
+	if (attr->iter_create.flags)
+		return -EINVAL;
+
+	link = bpf_link_get_from_fd(attr->iter_create.link_fd);
+	if (IS_ERR(link))
+		return PTR_ERR(link);
+
+	err = bpf_iter_new_fd(link);
+	bpf_link_put(link);
+
+	return err;
+}
 SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, size)
 {
 	union bpf_attr attr;
