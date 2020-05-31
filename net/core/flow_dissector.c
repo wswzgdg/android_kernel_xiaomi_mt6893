@@ -61,8 +61,7 @@ EXPORT_SYMBOL(skb_flow_dissector_init);
 
 #ifdef CONFIG_BPF_SYSCALL
 int flow_dissector_bpf_prog_attach_check(struct net *net,
-					 struct bpf_prog *prog)
-{
+					 struct bpf_prog *prog){
 	enum netns_bpf_attach_type type = NETNS_BPF_FLOW_DISSECTOR;
 
 	if (net == &init_net) {
@@ -112,7 +111,6 @@ static __be16 skb_flow_get_be16(const struct sk_buff *skb, int poff,
 
 	return 0;
 }
-
 /**
  * __skb_flow_get_ports - extract the upper layer ports and return them
  * @skb: sk_buff to extract the ports from
@@ -1364,8 +1362,7 @@ static int __init init_default_flow_dissectors(void)
 				ARRAY_SIZE(flow_keys_dissector_symmetric_keys));
 	skb_flow_dissector_init(&flow_keys_buf_dissector,
 				flow_keys_buf_dissector_keys,
-				ARRAY_SIZE(flow_keys_buf_dissector_keys));
-	return 0;
+				ARRAY_SIZE(flow_keys_buf_dissector_keys));	return 0;
 }
 
 core_initcall(init_default_flow_dissectors);

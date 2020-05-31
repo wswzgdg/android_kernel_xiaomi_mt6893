@@ -177,7 +177,6 @@ int netns_bpf_prog_query(const union bpf_attr *attr,
 	enum netns_bpf_attach_type type;
 	struct net *net;
 	int ret;
-
 	if (attr->query.query_flags)
 		return -EINVAL;
 
@@ -194,8 +193,7 @@ int netns_bpf_prog_query(const union bpf_attr *attr,
 	mutex_unlock(&netns_bpf_mutex);
 
 	put_net(net);
-	return ret;
-}
+	return ret;}
 
 int netns_bpf_prog_attach(const union bpf_attr *attr, struct bpf_prog *prog)
 {
@@ -207,7 +205,6 @@ int netns_bpf_prog_attach(const union bpf_attr *attr, struct bpf_prog *prog)
 
 	if (attr->target_fd || attr->attach_flags || attr->replace_bpf_fd)
 		return -EINVAL;
-
 	type = to_netns_bpf_attach_type(attr->attach_type);
 	if (type < 0)
 		return -EINVAL;
@@ -223,8 +220,7 @@ int netns_bpf_prog_attach(const union bpf_attr *attr, struct bpf_prog *prog)
 
 	switch (type) {
 	case NETNS_BPF_FLOW_DISSECTOR:
-		ret = flow_dissector_bpf_prog_attach_check(net, prog);
-		break;
+		ret = flow_dissector_bpf_prog_attach_check(net, prog);		break;
 	default:
 		ret = -EINVAL;
 		break;
@@ -257,8 +253,7 @@ int netns_bpf_prog_attach(const union bpf_attr *attr, struct bpf_prog *prog)
 	if (attached)
 		bpf_prog_put(attached);
 
-out_unlock:
-	mutex_unlock(&netns_bpf_mutex);
+out_unlock:	mutex_unlock(&netns_bpf_mutex);
 
 	return ret;
 }
@@ -278,8 +273,7 @@ static int __netns_bpf_prog_detach(struct net *net,
 	if (!attached || attached != old)
 		return -ENOENT;
 	netns_bpf_run_array_detach(net, type);
-	net->bpf.progs[type] = NULL;
-	bpf_prog_put(attached);
+	net->bpf.progs[type] = NULL;	bpf_prog_put(attached);
 	return 0;
 }
 
@@ -291,7 +285,6 @@ int netns_bpf_prog_detach(const union bpf_attr *attr, enum bpf_prog_type ptype)
 
 	if (attr->target_fd)
 		return -EINVAL;
-
 	type = to_netns_bpf_attach_type(attr->attach_type);
 	if (type < 0)
 		return -EINVAL;
@@ -430,13 +423,11 @@ static void __net_exit netns_bpf_pernet_pre_exit(struct net *net)
 			net_link->net = NULL; /* auto-detach link */
 		if (net->bpf.progs[type])
 			bpf_prog_put(net->bpf.progs[type]);
-	}
-	mutex_unlock(&netns_bpf_mutex);
+	}	mutex_unlock(&netns_bpf_mutex);
 }
 
 static struct pernet_operations netns_bpf_pernet_ops __net_initdata = {
-	.init = netns_bpf_pernet_init,
-	.pre_exit = netns_bpf_pernet_pre_exit,
+	.init = netns_bpf_pernet_init,	.pre_exit = netns_bpf_pernet_pre_exit,
 };
 
 static int __init netns_bpf_init(void)
