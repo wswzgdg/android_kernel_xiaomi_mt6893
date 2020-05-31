@@ -396,7 +396,44 @@ cleanup:
 }
 
 /**
- * __cgroup_bpf_detach() - Detach the program from a cgroup, and
+/**
+ * __cgroup_bpf_replace() - Replace link's program and propagate the change
+ *                          to descendants
+ * @cgrp: The cgroup which descendants to traverse
+ * @link: A link for which to replace BPF program
+ * @type: Type of attach operation
+ *
+ * Must be called with cgroup_mutex held.
+ */
+static int __cgroup_bpf_replace(struct cgroup *cgrp,
+				struct bpf_cgroup_link *link,
+				struct bpf_prog *new_prog)
+{
+	struct list_head *progs = &cgrp->bpf.progs[link->type];
+	struct bpf_prog *old_prog;
+	struct bpf_prog_list *pl;
+	bool found = false;
+
+	if (link->link.prog->type != new_prog->type)
+		return -EINVAL;
+
+	list_for_each_entry(pl, progs, node) {
+		if (pl->link == link) {
+			found = true;
+			break;
+		}
+	}
+	if (!found)
+		return -ENOENT;
+
+	old_prog = xchg(&link->link.prog, new_prog);
+	replace_effective_prog(cgrp, link->type, link);
+	bpf_prog_put(old_prog);
+	return 0;
+}
+
+/**
+ * __cgroup_bpf_detach() - Detach the program or link from a cgroup, and
  *                         propagate the change to descendants
  * @cgrp: The cgroup which descendants to traverse
  * @prog: A program to detach or NULL
