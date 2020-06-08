@@ -228,6 +228,43 @@ cleanup:
 
 #define BPF_CGROUP_MAX_PROGS 64
 
+static struct bpf_prog_list *find_attach_entry(struct list_head *progs,
+					       struct bpf_prog *prog,
+					       struct bpf_cgroup_link *link,
+					       struct bpf_prog *replace_prog,
+					       bool allow_multi)
+{
+	struct bpf_prog_list *pl;
+
+	/* single-attach case */
+	if (!allow_multi) {
+		if (list_empty(progs))
+			return NULL;
+		return list_first_entry(progs, typeof(*pl), node);
+	}
+
+	list_for_each_entry(pl, progs, node) {
+		if (prog && pl->prog == prog && prog != replace_prog)
+			/* disallow attaching the same prog twice */
+			return ERR_PTR(-EINVAL);
+		if (link && pl->link == link)
+			/* disallow attaching the same link twice */
+			return ERR_PTR(-EINVAL);
+	}
+
+	/* direct prog multi-attach w/ replacement case */
+	if (replace_prog) {
+		list_for_each_entry(pl, progs, node) {
+			if (pl->prog == replace_prog)
+				/* a match found */
+				return pl;
+		}
+		/* prog to replace not found for cgroup */
+		return ERR_PTR(-ENOENT);
+	}
+
+	return NULL;
+}
 /**
  * __cgroup_bpf_attach() - Attach the program to a cgroup, and
  *                         propagate the change to descendants
