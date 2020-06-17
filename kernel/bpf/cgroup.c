@@ -889,7 +889,6 @@ static int sockopt_alloc_buf(struct bpf_sockopt_kern *ctx, int max_optlen)
 		return -ENOMEM;
 
 	ctx->optval_end = ctx->optval + max_optlen;
-
 	return max_optlen;
 }
 
@@ -1000,8 +999,6 @@ int __cgroup_bpf_run_filter_getsockopt(struct sock *sk, int level,
 	max_optlen = sockopt_alloc_buf(&ctx, max_optlen);
 	if (max_optlen < 0)
 		return max_optlen;
-
-	ctx.optlen = max_optlen;
 
 	if (!retval) {
 		/* If kernel getsockopt finished successfully,
