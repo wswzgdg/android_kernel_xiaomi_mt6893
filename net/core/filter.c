@@ -56,6 +56,8 @@
 #include <net/sock_reuseport.h>
 #include <net/busy_poll.h>
 #include <net/tcp.h>
+#include <linux/inetdevice.h>
+#include <net/xfrm.h>
 #include <linux/bpf_trace.h>
 
 /**
@@ -2567,6 +2569,10 @@ void xdp_do_flush_map(void)
 }
 EXPORT_SYMBOL_GPL(xdp_do_flush_map);
 
+struct bpf_dtab_netdev_kern {
+	struct net_device *dev;
+};
+
 static inline bool xdp_map_invalid(const struct bpf_prog *xdp_prog,
 				   unsigned long aux)
 {
@@ -2580,6 +2586,7 @@ static int xdp_do_redirect_map(struct net_device *dev, struct xdp_buff *xdp,
 	unsigned long map_owner = ri->map_owner;
 	struct bpf_map *map = ri->map;
 	struct net_device *fwd = NULL;
+	struct bpf_dtab_netdev *dst;
 	u32 index = ri->ifindex;
 	int err;
 
@@ -2593,10 +2600,13 @@ static int xdp_do_redirect_map(struct net_device *dev, struct xdp_buff *xdp,
 		goto err;
 	}
 
-	if (map->map_type == BPF_MAP_TYPE_DEVMAP)
-		fwd = __dev_map_lookup_elem(map, index);
-	else if (map->map_type == BPF_MAP_TYPE_DEVMAP_HASH)
-		fwd = __dev_map_hash_lookup_elem(map, index);
+	if (map->map_type == BPF_MAP_TYPE_DEVMAP) {
+		dst = __dev_map_lookup_elem(map, index);
+		fwd = dst ? ((struct bpf_dtab_netdev_kern *)dst)->dev : NULL;
+	} else if (map->map_type == BPF_MAP_TYPE_DEVMAP_HASH) {
+		dst = __dev_map_hash_lookup_elem(map, index);
+		fwd = dst ? ((struct bpf_dtab_netdev_kern *)dst)->dev : NULL;
+	}
 	if (!fwd) {
 		err = -EINVAL;
 		goto err;
@@ -2653,6 +2663,7 @@ int xdp_do_generic_redirect(struct net_device *dev, struct sk_buff *skb,
 	unsigned long map_owner = ri->map_owner;
 	struct bpf_map *map = ri->map;
 	struct net_device *fwd = NULL;
+	struct bpf_dtab_netdev *dst;
 	u32 index = ri->ifindex;
 	unsigned int len;
 	int err = 0;
@@ -2667,10 +2678,13 @@ int xdp_do_generic_redirect(struct net_device *dev, struct sk_buff *skb,
 			map = NULL;
 			goto err;
 		}
-		if (map->map_type == BPF_MAP_TYPE_DEVMAP)
-			fwd = __dev_map_lookup_elem(map, index);
-		else if (map->map_type == BPF_MAP_TYPE_DEVMAP_HASH)
-			fwd = __dev_map_hash_lookup_elem(map, index);
+		if (map->map_type == BPF_MAP_TYPE_DEVMAP) {
+			dst = __dev_map_lookup_elem(map, index);
+			fwd = dst ? ((struct bpf_dtab_netdev_kern *)dst)->dev : NULL;
+		} else if (map->map_type == BPF_MAP_TYPE_DEVMAP_HASH) {
+			dst = __dev_map_hash_lookup_elem(map, index);
+			fwd = dst ? ((struct bpf_dtab_netdev_kern *)dst)->dev : NULL;
+		}
 	} else {
 		fwd = dev_get_by_index_rcu(dev_net(dev), index);
 	}
@@ -3194,7 +3208,11 @@ BPF_CALL_5(bpf_setsockopt, struct bpf_sock_ops_kern *, bpf_sock,
 				ifindex = dev->ifindex;
 				dev_put(dev);
 			}
-			ret = sock_bindtoindex(sk, ifindex, false);
+			lock_sock(sk);
+			sk->sk_bound_dev_if = ifindex;
+			sk_dst_reset(sk);
+			release_sock(sk);
+			ret = 0;
 			break;
 		default:
 			ret = -EINVAL;
@@ -3302,6 +3320,7 @@ static const struct bpf_func_proto bpf_bind_proto = {
 	.arg3_type	= ARG_CONST_SIZE,
 };
 
+#if IS_ENABLED(CONFIG_XFRM)
 BPF_CALL_5(bpf_skb_get_xfrm_state, struct sk_buff *, skb, u32, index,
 	   struct bpf_xfrm_state *, to, u32, size, u64, flags)
 {
@@ -3347,6 +3366,7 @@ static const struct bpf_func_proto bpf_skb_get_xfrm_state_proto = {
 };
 #endif
 
+#if 0 /* disabled: unsupported fib lookup backport on 4.14 */
 #if IS_ENABLED(CONFIG_INET) || IS_ENABLED(CONFIG_IPV6)
 static int bpf_fib_set_fwd_params(struct bpf_fib_lookup *params,
 				  const struct neighbour *neigh,
@@ -3668,6 +3688,7 @@ static const struct bpf_func_proto bpf_skb_fib_lookup_proto = {
 	.arg3_type      = ARG_CONST_SIZE,
 	.arg4_type	= ARG_ANYTHING,
 };
+#endif /* disabled: unsupported fib lookup backport on 4.14 */
 
 #if IS_ENABLED(CONFIG_IPV6_SEG6_BPF)
 static int bpf_push_seg6_encap(struct sk_buff *skb, u32 type, void *hdr, u32 len)
@@ -4003,6 +4024,7 @@ do {									\
 	}								\
 } while (0)
 
+#if 0 /* disabled: unsupported socket lookup backport on 4.14 */
 #ifdef CONFIG_INET
 static struct sock *sk_lookup(struct net *net, struct bpf_sock_tuple *tuple,
 			      int dif, int sdif, u8 family, u8 proto)
@@ -4349,6 +4371,7 @@ static const struct bpf_func_proto bpf_sock_addr_sk_lookup_udp_proto = {
 	.arg4_type	= ARG_ANYTHING,
 	.arg5_type	= ARG_ANYTHING,
 };
+#endif /* disabled: unsupported socket lookup backport on 4.14 */
 
 bool bpf_tcp_sock_is_valid_access(int off, int size, enum bpf_access_type type,
 				  struct bpf_insn_access_aux *info)
@@ -4574,6 +4597,7 @@ static const struct bpf_func_proto bpf_tcp_check_syncookie_proto = {
 
 #endif /* CONFIG_INET */
 
+#if 0 /* duplicate newer bpf_helper_changes_pkt_data backport */
 bool bpf_helper_changes_pkt_data(void *func)
 {
 	if (func == bpf_skb_vlan_push ||
@@ -4607,6 +4631,7 @@ bool bpf_helper_changes_pkt_data(void *func)
 
 	return false;
 }
+#endif
 
 static const struct bpf_func_proto *
 bpf_base_func_proto(enum bpf_func_id func_id)
@@ -4618,12 +4643,6 @@ bpf_base_func_proto(enum bpf_func_id func_id)
 		return &bpf_map_update_elem_proto;
 	case BPF_FUNC_map_delete_elem:
 		return &bpf_map_delete_elem_proto;
-	case BPF_FUNC_map_push_elem:
-		return &bpf_map_push_elem_proto;
-	case BPF_FUNC_map_pop_elem:
-		return &bpf_map_pop_elem_proto;
-	case BPF_FUNC_map_peek_elem:
-		return &bpf_map_peek_elem_proto;
 	case BPF_FUNC_get_prandom_u32:
 		return &bpf_get_prandom_u32_proto;
 	case BPF_FUNC_get_smp_processor_id:
@@ -4634,8 +4653,6 @@ bpf_base_func_proto(enum bpf_func_id func_id)
 		return &bpf_tail_call_proto;
 	case BPF_FUNC_ktime_get_ns:
 		return &bpf_ktime_get_ns_proto;
-	case BPF_FUNC_ktime_get_boot_ns:
-		return &bpf_ktime_get_boot_ns_proto;
 	case BPF_FUNC_trace_printk:
 		if (capable(CAP_SYS_ADMIN))
 			return bpf_get_trace_printk_proto();
@@ -6113,28 +6130,24 @@ const struct bpf_verifier_ops tc_cls_act_prog_ops = {
 	.is_valid_access	= tc_cls_act_is_valid_access,
 	.convert_ctx_access	= tc_cls_act_convert_ctx_access,
 	.gen_prologue		= tc_cls_act_prologue,
-	.test_run		= bpf_prog_test_run_skb,
 };
 
 const struct bpf_verifier_ops xdp_prog_ops = {
 	.get_func_proto		= xdp_func_proto,
 	.is_valid_access	= xdp_is_valid_access,
 	.convert_ctx_access	= xdp_convert_ctx_access,
-	.test_run		= bpf_prog_test_run_xdp,
 };
 
 const struct bpf_verifier_ops cg_skb_prog_ops = {
 	.get_func_proto		= sk_filter_func_proto,
 	.is_valid_access	= sk_filter_is_valid_access,
 	.convert_ctx_access	= bpf_convert_ctx_access,
-	.test_run		= bpf_prog_test_run_skb,
 };
 
 const struct bpf_verifier_ops lwt_inout_prog_ops = {
 	.get_func_proto		= lwt_inout_func_proto,
 	.is_valid_access	= lwt_is_valid_access,
 	.convert_ctx_access	= bpf_convert_ctx_access,
-	.test_run		= bpf_prog_test_run_skb,
 };
 
 const struct bpf_verifier_ops lwt_xmit_prog_ops = {
@@ -6142,7 +6155,6 @@ const struct bpf_verifier_ops lwt_xmit_prog_ops = {
 	.is_valid_access	= lwt_is_valid_access,
 	.convert_ctx_access	= bpf_convert_ctx_access,
 	.gen_prologue		= tc_cls_act_prologue,
-	.test_run		= bpf_prog_test_run_skb,
 };
 
 const struct bpf_verifier_ops cg_sock_prog_ops = {

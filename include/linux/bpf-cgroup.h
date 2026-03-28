@@ -14,9 +14,16 @@ struct sockaddr;
 struct cgroup;
 struct sk_buff;
 struct bpf_map;
+struct ctl_table;
+struct ctl_table_header;
 struct bpf_prog;
 struct bpf_sock_ops_kern;
 struct bpf_cgroup_storage;
+struct bpf_cgroup_storage_key {
+	__u64	cgroup_inode_id;
+	__u32	attach_type;
+	__u32	padding;
+};
 
 #ifdef CONFIG_CGROUP_BPF
 
@@ -220,6 +227,24 @@ void bpf_cgroup_storage_release(struct bpf_prog *prog, struct bpf_map *map);
 #define BPF_CGROUP_RUN_PROG_UDP6_SENDMSG_LOCK(sk, uaddr, t_ctx)		       \
 	BPF_CGROUP_RUN_SA_PROG_LOCK(sk, uaddr, BPF_CGROUP_UDP6_SENDMSG, t_ctx)
 
+int __cgroup_bpf_run_filter_sysctl(struct ctl_table_header *head,
+				   struct ctl_table *table, int write,
+				   void __user *buf, size_t *pcount,
+				   loff_t *ppos, void **new_buf,
+				   enum bpf_attach_type type);
+int __cgroup_bpf_run_filter_setsockopt(struct sock *sk, int *level,
+				       int *optname, char __user *optval,
+				       int *optlen, char **kernel_optval);
+int __cgroup_bpf_run_filter_getsockopt(struct sock *sk, int level,
+				       int optname, char __user *optval,
+				       int __user *optlen, int max_optlen,
+				       int retval);
+
+#define BPF_CGROUP_RUN_PROG_SYSCTL(head, table, write, buf, count, ppos, new_buf) ({ int __ret = 0; if (cgroup_bpf_enabled) __ret = __cgroup_bpf_run_filter_sysctl(head, table, write, buf, count, ppos, new_buf, BPF_CGROUP_SYSCTL); __ret; })
+#define BPF_CGROUP_RUN_PROG_SETSOCKOPT(sk, level, optname, optval, optlen, kernel_optval) ({ int __ret = 0; if (cgroup_bpf_enabled) __ret = __cgroup_bpf_run_filter_setsockopt(sk, level, optname, optval, optlen, kernel_optval); __ret; })
+#define BPF_CGROUP_GETSOCKOPT_MAX_OPTLEN(optlen) (max_t(int, 16, optlen))
+#define BPF_CGROUP_RUN_PROG_GETSOCKOPT(sk, level, optname, optval, optlen, max_optlen, retval) ({ int __ret = retval; if (cgroup_bpf_enabled) __ret = __cgroup_bpf_run_filter_getsockopt(sk, level, optname, optval, optlen, max_optlen, retval); __ret; })
+
 #define BPF_CGROUP_RUN_PROG_SOCK_OPS(sock_ops)				       \
 ({									       \
 	int __ret = 0;							       \
@@ -303,6 +328,10 @@ static inline void bpf_cgroup_storage_free(
 #define BPF_CGROUP_RUN_PROG_UDP6_SENDMSG_LOCK(sk, uaddr, t_ctx) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_SOCK_OPS(sock_ops) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_DEVICE_CGROUP(type,major,minor,access) ({ 0; })
+#define BPF_CGROUP_RUN_PROG_SYSCTL(head, table, write, buf, count, ppos, new_buf) ({ 0; })
+#define BPF_CGROUP_RUN_PROG_SETSOCKOPT(sk, level, optname, optval, optlen, kernel_optval) ({ 0; })
+#define BPF_CGROUP_GETSOCKOPT_MAX_OPTLEN(optlen) (optlen)
+#define BPF_CGROUP_RUN_PROG_GETSOCKOPT(sk, level, optname, optval, optlen, max_optlen, retval) (retval)
 
 #define for_each_cgroup_storage_type(stype) for (; false; )
 

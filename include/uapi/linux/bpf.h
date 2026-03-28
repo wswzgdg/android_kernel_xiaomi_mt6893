@@ -2137,6 +2137,66 @@ enum bpf_ret_code {
 	/* >127 are reserved for prog type specific return codes */
 };
 
+enum bpf_fib_lookup_ret {
+	BPF_FIB_LKUP_RET_SUCCESS,
+	BPF_FIB_LKUP_RET_BLACKHOLE,
+	BPF_FIB_LKUP_RET_UNREACHABLE,
+	BPF_FIB_LKUP_RET_PROHIBIT,
+	BPF_FIB_LKUP_RET_NOT_FWDED,
+	BPF_FIB_LKUP_RET_FWD_DISABLED,
+	BPF_FIB_LKUP_RET_UNSUPP_LWT,
+	BPF_FIB_LKUP_RET_NO_NEIGH,
+	BPF_FIB_LKUP_RET_FRAG_NEEDED,
+};
+
+enum {
+	BPF_FIB_LOOKUP_DIRECT = (1U << 0),
+	BPF_FIB_LOOKUP_OUTPUT = (1U << 1),
+};
+
+struct bpf_fib_lookup {
+	__u8	family;
+	__u8	l4_protocol;
+	__be16	sport;
+	__be16	dport;
+	union {
+		__be32	tot_len;
+		__u16	mtu_result;
+	};
+	__u32	ifindex;
+	union {
+		/* inputs */
+		__u8	tos;
+		__be32	flowinfo;
+
+		/* output */
+		__u32	rt_metric;
+	};
+
+	union {
+		__be32	ipv4_src;
+		__u32	ipv6_src[4];
+	};
+	union {
+		__be32	ipv4_dst;
+		__u32	ipv6_dst[4];
+	};
+
+	__be16	h_vlan_proto;
+	__be16	h_vlan_TCI;
+	__u8	smac[6];
+	__u8	dmac[6];
+};
+
+struct bpf_xfrm_state {
+	__u32 reqid;
+	__u32 spi;
+	__u16 family;
+	__u16 ext;
+	__u32 remote_ipv4;
+	__u32 remote_ipv6[4];
+};
+
 struct bpf_sock {
 	__u32 bound_dev_if;
 	__u32 family;
@@ -2344,6 +2404,12 @@ struct bpf_sysctl {
 				 * Allows 1,2,4-byte read an 4-byte write.
 				 */
 };
+
+#define __bpf_md_ptr(type, name)	\
+union {					\
+	type name;			\
+	__u64 :64;			\
+} __attribute__((aligned(8)))
 
 struct bpf_sockopt {
 	__bpf_md_ptr(struct bpf_sock *, sk);

@@ -12,7 +12,6 @@
 #include <linux/ctype.h>
 #include <linux/kprobes.h>
 #include <linux/syscalls.h>
-#include <linux/error-injection.h>
 
 #include <asm/tlb.h>
 

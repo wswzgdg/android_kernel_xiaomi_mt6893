@@ -1550,16 +1550,16 @@ static struct bpf_prog_dummy {
  */
 static struct {
 	struct bpf_prog_array hdr;
-	struct bpf_prog *null_prog;
+	struct bpf_prog_array_item item;
 } empty_prog_array = {
-	.null_prog = NULL,
+	.item = { },
 };
 
 struct bpf_prog_array __rcu *bpf_prog_array_alloc(u32 prog_cnt, gfp_t flags)
 {
 	if (prog_cnt)
 		return kzalloc(sizeof(struct bpf_prog_array) +
-			       sizeof(struct bpf_prog *) * (prog_cnt + 1),
+			       sizeof(struct bpf_prog_array_item) * (prog_cnt + 1),
 			       flags);
 
 	return &empty_prog_array.hdr;
@@ -1575,13 +1575,13 @@ void bpf_prog_array_free(struct bpf_prog_array __rcu *progs)
 
 bool bpf_prog_array_is_empty(struct bpf_prog_array __rcu *array)
 {
-	struct bpf_prog **prog;
+	struct bpf_prog_array_item *item;
 	bool empty = true;
 
 	rcu_read_lock();
-	prog = rcu_dereference(array)->progs;
-	for (; *prog; prog++)
-		if (*prog != &dummy_bpf_prog.prog) {
+	item = &rcu_dereference(array)->items[0];
+	for (; item->prog; item++)
+		if (item->prog != &dummy_bpf_prog.prog) {
 			empty = false;
 			break;
 		}
@@ -1592,11 +1592,11 @@ bool bpf_prog_array_is_empty(struct bpf_prog_array __rcu *array)
 void bpf_prog_array_delete_safe(struct bpf_prog_array __rcu *progs,
 				struct bpf_prog *old_prog)
 {
-	struct bpf_prog **prog = progs->progs;
+	struct bpf_prog_array_item *item = progs->items;
 
-	for (; *prog; prog++)
-		if (*prog == old_prog) {
-			WRITE_ONCE(*prog, &dummy_bpf_prog.prog);
+	for (; item->prog; item++)
+		if (item->prog == old_prog) {
+			WRITE_ONCE(item->prog, &dummy_bpf_prog.prog);
 			break;
 		}
 }
@@ -1607,63 +1607,55 @@ int bpf_prog_array_copy(struct bpf_prog_array __rcu *old_array,
 			struct bpf_prog_array **new_array)
 {
 	int new_prog_cnt, carry_prog_cnt = 0;
-	struct bpf_prog **existing_prog;
+	struct bpf_prog_array_item *existing_item;
 	struct bpf_prog_array *array;
 	int new_prog_idx = 0;
 
-	/* Figure out how many existing progs we need to carry over to
-	 * the new array.
-	 */
 	if (old_array) {
-		existing_prog = old_array->progs;
-		for (; *existing_prog; existing_prog++) {
-			if (*existing_prog != exclude_prog &&
-			    *existing_prog != &dummy_bpf_prog.prog)
+		existing_item = old_array->items;
+		for (; existing_item->prog; existing_item++) {
+			if (existing_item->prog != exclude_prog &&
+			    existing_item->prog != &dummy_bpf_prog.prog)
 				carry_prog_cnt++;
-			if (*existing_prog == include_prog)
+			if (existing_item->prog == include_prog)
 				return -EEXIST;
 		}
 	}
 
-	/* How many progs (not NULL) will be in the new array? */
 	new_prog_cnt = carry_prog_cnt;
 	if (include_prog)
 		new_prog_cnt += 1;
-
-	/* Do we have any prog (not NULL) in the new array? */
 	if (!new_prog_cnt) {
 		*new_array = NULL;
 		return 0;
 	}
 
-	/* +1 as the end of prog_array is marked with NULL */
 	array = bpf_prog_array_alloc(new_prog_cnt + 1, GFP_KERNEL);
 	if (!array)
 		return -ENOMEM;
 
-	/* Fill in the new prog array */
 	if (carry_prog_cnt) {
-		existing_prog = old_array->progs;
-		for (; *existing_prog; existing_prog++)
-			if (*existing_prog != exclude_prog &&
-			    *existing_prog != &dummy_bpf_prog.prog)
-				array->progs[new_prog_idx++] = *existing_prog;
+		existing_item = old_array->items;
+		for (; existing_item->prog; existing_item++)
+			if (existing_item->prog != exclude_prog &&
+			    existing_item->prog != &dummy_bpf_prog.prog)
+				array->items[new_prog_idx++] = *existing_item;
 	}
 	if (include_prog)
-		array->progs[new_prog_idx++] = include_prog;
-	array->progs[new_prog_idx] = NULL;
+		array->items[new_prog_idx++].prog = include_prog;
+	array->items[new_prog_idx].prog = NULL;
 	*new_array = array;
 	return 0;
 }
 
 int bpf_prog_array_length(struct bpf_prog_array __rcu *progs)
 {
-	struct bpf_prog **prog;
+	struct bpf_prog_array_item *item;
 	u32 cnt = 0;
 
 	rcu_read_lock();
-	prog = rcu_dereference(progs)->progs;
-	for (; *prog; prog++)
+	item = &rcu_dereference(progs)->items[0];
+	for (; item->prog; item++)
 		cnt++;
 	rcu_read_unlock();
 	return cnt;
@@ -1672,24 +1664,24 @@ int bpf_prog_array_length(struct bpf_prog_array __rcu *progs)
 int bpf_prog_array_copy_to_user(struct bpf_prog_array __rcu *progs,
 				__u32 __user *prog_ids, u32 cnt)
 {
-	struct bpf_prog **prog;
+	struct bpf_prog_array_item *item;
 	u32 i = 0, id;
 
 	rcu_read_lock();
-	prog = rcu_dereference(progs)->progs;
-	for (; *prog; prog++) {
-		id = (*prog)->aux->id;
+	item = &rcu_dereference(progs)->items[0];
+	for (; item->prog; item++) {
+		id = item->prog->aux->id;
 		if (copy_to_user(prog_ids + i, &id, sizeof(id))) {
 			rcu_read_unlock();
 			return -EFAULT;
 		}
 		if (++i == cnt) {
-			prog++;
+			item++;
 			break;
 		}
 	}
 	rcu_read_unlock();
-	if (*prog)
+	if (item->prog)
 		return -ENOSPC;
 	return 0;
 }

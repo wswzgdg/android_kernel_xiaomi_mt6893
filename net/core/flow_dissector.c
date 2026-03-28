@@ -61,31 +61,8 @@ EXPORT_SYMBOL(skb_flow_dissector_init);
 
 #ifdef CONFIG_BPF_SYSCALL
 int flow_dissector_bpf_prog_attach_check(struct net *net,
-					 struct bpf_prog *prog){
-	enum netns_bpf_attach_type type = NETNS_BPF_FLOW_DISSECTOR;
-
-	if (net == &init_net) {
-		/* BPF flow dissector in the root namespace overrides
-		 * any per-net-namespace one. When attaching to root,
-		 * make sure we don't have any BPF program attached
-		 * to the non-root namespaces.
-		 */
-		struct net *ns;
-
-		for_each_net(ns) {
-			if (ns == &init_net)
-				continue;
-			if (rcu_access_pointer(ns->bpf.run_array[type]))
-				return -EEXIST;
-		}
-	} else {
-		/* Make sure root flow dissector is not attached
-		 * when attaching to the non-root namespace.
-		 */
-		if (rcu_access_pointer(init_net.bpf.run_array[type]))
-			return -EEXIST;
-	}
-
+				 struct bpf_prog *prog)
+{
 	return 0;
 }
 #endif /* CONFIG_BPF_SYSCALL */
@@ -472,6 +449,7 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 	int num_hdrs = 0;
 	u8 ip_proto = 0;
 	bool ret;
+	struct net *net = NULL;
 
 	if (!data) {
 		data = skb->data;
@@ -519,44 +497,6 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 	}
 
 	WARN_ON_ONCE(!net);
-	if (net) {
-		enum netns_bpf_attach_type type = NETNS_BPF_FLOW_DISSECTOR;
-		struct bpf_prog_array *run_array;
-
-		rcu_read_lock();
-		run_array = rcu_dereference(init_net.bpf.run_array[type]);
-		if (!run_array)
-			run_array = rcu_dereference(net->bpf.run_array[type]);
-
-		if (run_array) {
-			struct bpf_flow_keys flow_keys;
-			struct bpf_flow_dissector ctx = {
-				.flow_keys = &flow_keys,
-				.data = data,
-				.data_end = data + hlen,
-			};
-			__be16 n_proto = proto;
-			struct bpf_prog *prog;
-
-			if (skb) {
-				ctx.skb = skb;
-				/* we can't use 'proto' in the skb case
-				 * because it might be set to skb->vlan_proto
-				 * which has been pulled from the data
-				 */
-				n_proto = skb->protocol;
-			}
-
-			prog = READ_ONCE(run_array->items[0].prog);
-			ret = bpf_flow_dissect(prog, &ctx, n_proto, nhoff,
-					       hlen, flags);
-			__skb_flow_bpf_to_target(&flow_keys, flow_dissector,
-						 target_container);
-			rcu_read_unlock();
-			return ret;
-		}
-		rcu_read_unlock();
-	}
 
 	if (dissector_uses_key(flow_dissector,
 			       FLOW_DISSECTOR_KEY_ETH_ADDRS)) {

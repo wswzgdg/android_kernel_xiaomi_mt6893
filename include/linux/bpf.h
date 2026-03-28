@@ -292,6 +292,7 @@ struct bpf_prog_aux {
 	struct latch_tree_node ksym_tnode;
 	struct list_head ksym_lnode;
 	const struct bpf_prog_ops *ops;
+	const struct bpf_verifier_ops *verifier_ops;
 	struct bpf_map **used_maps;
 	struct bpf_prog *prog;
 	struct user_struct *user;
@@ -429,11 +430,15 @@ extern const struct file_operations bpf_prog_fops;
 	extern const struct bpf_verifier_ops _name ## _verifier_ops;
 #define BPF_MAP_TYPE(_id, _ops) \
 	extern const struct bpf_map_ops _ops;
+#define BPF_LINK_TYPE(_id, _name) \
+	extern const struct bpf_link_ops bpf_##_name##_link_lops;
 #include <linux/bpf_types.h>
+#undef BPF_LINK_TYPE
 #undef BPF_PROG_TYPE
 #undef BPF_MAP_TYPE
 
 extern const struct bpf_prog_ops bpf_offload_prog_ops;
+extern const struct bpf_verifier_ops bpf_offload_verifier_ops;
 extern const struct bpf_verifier_ops tc_cls_act_analyzer_ops;
 extern const struct bpf_verifier_ops xdp_analyzer_ops;
 
@@ -515,7 +520,9 @@ void bpf_patch_call_args(struct bpf_insn *insn, u32 stack_depth);
 struct xdp_buff;
 struct sk_buff;
 
+struct bpf_dtab_netdev;
 struct bpf_dtab_netdev *__dev_map_lookup_elem(struct bpf_map *map, u32 key);
+struct bpf_dtab_netdev *__dev_map_hash_lookup_elem(struct bpf_map *map, u32 key);
 void __dev_map_insert_ctx(struct bpf_map *map, u32 index);
 void __dev_map_flush(struct bpf_map *map);
 int dev_map_enqueue(struct bpf_dtab_netdev *dst, struct xdp_buff *xdp,
@@ -606,7 +613,6 @@ static inline void __dev_map_flush(struct bpf_map *map)
 }
 
 struct xdp_buff;
-struct bpf_dtab_netdev;
 
 static inline
 int dev_map_enqueue(struct bpf_dtab_netdev *dst, struct xdp_buff *xdp,

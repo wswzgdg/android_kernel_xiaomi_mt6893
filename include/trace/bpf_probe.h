@@ -4,6 +4,13 @@
 
 #ifdef CONFIG_BPF_EVENTS
 
+#define ___bpf_concat(a, b) a##b
+#define __bpf_concat(a, b) ___bpf_concat(a, b)
+#define CONCATENATE(a, b) __bpf_concat(a, b)
+#define __bpf_narg(...) __bpf_narg_(__VA_ARGS__,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0)
+#define __bpf_narg_(_1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16,N,...) N
+#define COUNT_ARGS(...) __bpf_narg(__VA_ARGS__)
+
 #undef __entry
 #define __entry entry
 
@@ -35,10 +42,10 @@
 		   __builtin_choose_expr(size == 8, (u64)4, \
 					 (void)5)))))
 #define __CAST_TO_U64(x) ({ \
-	typeof(x) __src = (x); \
-	UINTTYPE(sizeof(x)) __dst; \
-	memcpy(&__dst, &__src, sizeof(__dst)); \
-	(u64)__dst; })
+	__typeof__(x) __src = (x); \
+	u64 __dst = 0; \
+	memcpy(&__dst, &__src, sizeof(__src)); \
+	__dst; })
 
 #define __CAST1(a,...) __CAST_TO_U64(a)
 #define __CAST2(a,...) __CAST_TO_U64(a), __CAST1(__VA_ARGS__)
@@ -52,8 +59,29 @@
 #define __CAST10(a,...) __CAST_TO_U64(a), __CAST9(__VA_ARGS__)
 #define __CAST11(a,...) __CAST_TO_U64(a), __CAST10(__VA_ARGS__)
 #define __CAST12(a,...) __CAST_TO_U64(a), __CAST11(__VA_ARGS__)
-/* tracepoints with more than 12 arguments will hit build error */
+#define __CAST13(a,...) __CAST_TO_U64(a), __CAST12(__VA_ARGS__)
+#define __CAST14(a,...) __CAST_TO_U64(a), __CAST13(__VA_ARGS__)
+#define __CAST15(a,...) __CAST_TO_U64(a), __CAST14(__VA_ARGS__)
+#define __CAST16(a,...) __CAST_TO_U64(a), __CAST15(__VA_ARGS__)
+/* tracepoints with more than 16 arguments will hit build error */
 #define CAST_TO_U64(...) CONCATENATE(__CAST, COUNT_ARGS(__VA_ARGS__))(__VA_ARGS__)
+
+void bpf_trace_run1(struct bpf_prog *prog, u64 arg0);
+void bpf_trace_run2(struct bpf_prog *prog, u64 arg0, u64 arg1);
+void bpf_trace_run3(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2);
+void bpf_trace_run4(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3);
+void bpf_trace_run5(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4);
+void bpf_trace_run6(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5);
+void bpf_trace_run7(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5, u64 arg6);
+void bpf_trace_run8(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5, u64 arg6, u64 arg7);
+void bpf_trace_run9(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5, u64 arg6, u64 arg7, u64 arg8);
+void bpf_trace_run10(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5, u64 arg6, u64 arg7, u64 arg8, u64 arg9);
+void bpf_trace_run11(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5, u64 arg6, u64 arg7, u64 arg8, u64 arg9, u64 arg10);
+void bpf_trace_run12(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5, u64 arg6, u64 arg7, u64 arg8, u64 arg9, u64 arg10, u64 arg11);
+void bpf_trace_run13(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5, u64 arg6, u64 arg7, u64 arg8, u64 arg9, u64 arg10, u64 arg11, u64 arg12);
+void bpf_trace_run14(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5, u64 arg6, u64 arg7, u64 arg8, u64 arg9, u64 arg10, u64 arg11, u64 arg12, u64 arg13);
+void bpf_trace_run15(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5, u64 arg6, u64 arg7, u64 arg8, u64 arg9, u64 arg10, u64 arg11, u64 arg12, u64 arg13, u64 arg14);
+void bpf_trace_run16(struct bpf_prog *prog, u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5, u64 arg6, u64 arg7, u64 arg8, u64 arg9, u64 arg10, u64 arg11, u64 arg12, u64 arg13, u64 arg14, u64 arg15);
 
 #undef DECLARE_EVENT_CLASS
 #define DECLARE_EVENT_CLASS(call, proto, args, tstruct, assign, print)	\
