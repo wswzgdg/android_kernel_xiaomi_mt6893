@@ -12,8 +12,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
-/dts-v1/;
-/plugin/;
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/spmi/spmi.h>
@@ -1008,5 +1006,4 @@ USB SWITCH GPIO end */
 };
 //NFC end 
 
-#include "mediatek/ares/cust.dtsi"
 /*End of this file, DO NOT ADD ANYTHING HERE*/

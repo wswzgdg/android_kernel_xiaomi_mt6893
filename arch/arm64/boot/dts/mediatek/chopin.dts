@@ -11,8 +11,7 @@
  GNU General Public License for more details.
  */
 
-/dts-v1/;
-/plugin/;
+#include "mediatek/mt6893.dts"
 #include "mediatek/chopin-mt6891.dtsi"
 
 / {
