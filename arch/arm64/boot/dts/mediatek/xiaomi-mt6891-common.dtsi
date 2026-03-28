@@ -115,49 +115,64 @@
 		compatible = "mediatek,vibrator";
 		vib_timer = <25>;
 		vib_limit = <9>;
-		vib_vol= <9>;
+		vib_vol= <11>;
 	};
 	usb_c_pinctrl:usb_c_pinctrl {
 		compatible = "mediatek,usb_c_pinctrl";
 	};
 };
 
+/* DISPSYS GPIO standardization */
 &pio {
-	uart_gpio_enable: uart_gpio_enable@gpio101 {
+	mtkfb_pins_lcm_rst_out1_gpio: lcm_rst_out1_gpio {
 		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO101__FUNC_GPIO101>;
+			pinmux = <PINMUX_GPIO42__FUNC_GPIO42>;
 			slew-rate = <1>;
-			bias-disable;
+			output-high;
+		};
+	};
+
+	mtkfb_pins_lcm_rst_out0_gpio: lcm_rst_out0_gpio {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO42__FUNC_GPIO42>;
+			slew-rate = <1>;
 			output-low;
 		};
 	};
 
-	uart_gpio_disable: uart_gpio_disable@gpio101 {
+	mtkfb_pins_lcm_dsi_te: lcm_dsi_te {
 		pins_cmd_dat {
-			pinmux = <PINMUX_GPIO101__FUNC_GPIO101>;
-			slew-rate = <1>;
-			bias-disable;
-			output-high;
+			pinmux = <PINMUX_GPIO41__FUNC_DSI_TE>;
 		};
 	};
 };
 
-&i2c9 {
-	et7480: et7480@42 {
-		status = "ok";
-		compatible = "mediatek,et7480-audioswitch";
-		reg = <0x42>;
-		pinctrl-names = "uart_enable", "uart_disable";
-		pinctrl-0 = <&uart_gpio_enable>;
-		pinctrl-1 = <&uart_gpio_disable>;
-	};
+&mtkfb {
+	pinctrl-names = "lcm_rst_out1_gpio", "lcm_rst_out0_gpio",
+		"mode_te_te";
+	pinctrl-0 = <&mtkfb_pins_lcm_rst_out1_gpio>;
+	pinctrl-1 = <&mtkfb_pins_lcm_rst_out0_gpio>;
+	pinctrl-2 = <&mtkfb_pins_lcm_dsi_te>;
+	status = "okay";
 };
+
+&dispsys_config {
+	pinctrl-names =
+		"lcm_rst_out1_gpio", "lcm_rst_out0_gpio",
+		"mode_te_te";
+	pinctrl-0 = <&mtkfb_pins_lcm_rst_out1_gpio>;
+	pinctrl-1 = <&mtkfb_pins_lcm_rst_out0_gpio>;
+	pinctrl-2 = <&mtkfb_pins_lcm_dsi_te>;
+	status = "okay";
+};
+/* DISPSYS GPIO standardization end */
+
 /* accdet start */
 &accdet {
 	/* accdet micbias voltage: 0x09:2.85v 0x08:2.8v 0x07,
 	 * 2.7v;0x05,2.5v;0x02,1.9v
 	 */
-	accdet-mic-vol = <5>;
+	accdet-mic-vol = <8>;
 	/* accdet pwm_width, pwm_thresh, fall_delay, rise_delay
 	 * debounce0, debounce1, debounce3, debounce4
 	 * eint pwm_width, eint pwm_thresh
@@ -179,7 +194,6 @@
 	/* select VTH to 2v and 500k, use internal resitance */
 	eint_use_ext_res = <0>;
 	status = "okay";
-	et7480-i2c-handle = <&et7480>;
 };
 /* accdet end */
 
@@ -228,26 +242,14 @@
 	};
 };
 
-&mt6360_ldo {
-	mt_pmic_vmc_ldo_reg: ldo3 {
-		regulator-compatible = "LDO3";
-		regulator-name = "VMC";
-	};
-
-	mt_pmic_vfp_ldo_reg: ldo1 {
-		regulator-compatible = "LDO1";
-		regulator-name = "VFP";
-	};
-};
-
 &goodix_fp {
 	pinctrl-names = "default", "reset_high", "reset_low", "eint_init", "spi_cs";
 	pinctrl-0 = <&fingerprint_default>;
 	pinctrl-1 = <&fingerprint_reset_high>;
 	pinctrl-2 = <&fingerprint_reset_low>;
 	pinctrl-3 = <&fingerprint_eint_init>;
+        fpc,gpio_irq = <&pio 15 0>;
 	pinctrl-4 = <&fingerprint_spi_cs>;
-	fpc,gpio_irq = <&pio 15 0>;
 	interrupt-parent = <&pio>;
 	interrupts = <15 IRQ_TYPE_EDGE_RISING 15 0>;
 	status = "okay";
@@ -498,36 +500,389 @@ USB SWITCH GPIO end */
 };
 /* GPS GPIO standardization end */
 
-&odm {
-	testing-mode {
-		compatible = "modem,testing-mode";
-		status-gpio = <&pio 23 0>;
-		debounce-time = <30>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&test_mode_irq23>;
+/*
+&i2c11 {
+	clock-frequency = <400000>;
+	aw2028@65 {
+		compatible = "awinic, aw2028_i2c";
+		reg = <0x65>;
+		status = "okay";
 	};
 };
+*/
 
+/* AW8697 Haptic start */
 &pio {
-	test_mode_irq23: test_mode_irq23 {
-                pins_cmd_dat {
-			pinmux = <PINMUX_GPIO23__FUNC_GPIO23>;
+	aw8697_reset_high: aw8697_reset_reset {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO129__FUNC_GPIO129>;
 			drive-strength = <2>;
 			bias-disable;
+			output-high;
+		};
+	};
+	aw8697_reset_low: aw8697_reset_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO129__FUNC_GPIO129>;
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+	aw8697_interrupt: aw8697_interrupt_active {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO22__FUNC_GPIO22>;
+			drive-strength = <2>;
+			bias-pull-up;
 			input-enable;
 		};
 	};
 };
 
+&i2c9 {
+	status = "ok";
+	aw8697_haptic@5a {
+		compatible = "awinic,aw8697_haptic";
+		reg = <0x5A>;
+		reset-gpio = <&pio 129 0>;
+		irq-gpio = <&pio 22 0>;
+		vib_mode = < 0 >;   /*mode:   RAM mode->0; CONT mode -> 1*/
+		vib_f0_pre = < 1700 >;
+		vib_f0_cali_percen = < 7 >;
+		vib_cont_drv_lev = < 60 >;
+		vib_cont_drv_lvl_ov = < 60 >;
+		vib_cont_td = < 0xef >;
+		vib_cont_zc_thr = < 0x08f8 >;  /*hq 0x08F8 */
+		vib_cont_num_brk = < 3 >;
+		vib_f0_coeff = < 260 >; /*Don't modify it    2.604167*/
+		vib_f0_trace_parameter = < 0x05 0x03 0x02 0x0f >;
+		vib_bemf_config = < 0 0x08 0x03 0xf8 >;
+		vib_sw_brake = < 0x2c >;
+		vib_tset = < 0x1a >;
+		vib_r_spare = < 0x68 >;
+		vib_bstdbg = < 0x30 0xeb 0xd4 0 0 0 >;
+		vib_effect_id_boundary = < 10 >;
+		vib_effect_max = < 197 >;   /*vib_effect_max must bigger than vib_effect_id*/
+		vib_trig_config = < 0 1 0 1 2
+						0 1 0 1 2
+						0 1 0 1 2 >;
+		vib_bst_vol_default = < 0x11 >;
+		vib_bst_vol_ram = < 0x11 >;
+		vib_bst_vol_rtp = < 0x11 >;
+		vib_rtp_time = < 20 20 20 20 20 20 20 20 20000 15000
+				 15000 20000 25000 15000 30000 25000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 >;
+		pinctrl-names = "aw8697_reset_reset","aw8697_reset_active","aw8697_interrupt_active";
+		pinctrl-0 = <&aw8697_reset_low>;
+		pinctrl-1 = <&aw8697_reset_high>;
+		pinctrl-2 = <&aw8697_interrupt>;
+		status = "ok";
+		wf_0 {
+			/*CLICK*/
+			mtk,effect-id = <0>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_1 {
+			/*DOUBLE CLICK*/
+			mtk,effect-id = <1>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [7e 3e];
+			mtk,wf-brake-pattern = [03 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_2 {
+			/*TICK*/
+			mtk,effect-id = <2>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [7e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_3 {
+			/*THUD*/
+			mtk,effect-id = <3>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_4 {
+			/*POP*/
+			mtk,effect-id = <4>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <28000>;
+		};
+		wf_5 {
+			/*HEAVY CLICK*/
+			mtk,effect-id = <5>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [7e 7e 7e];
+			mtk,wf-brake-pattern = [03 03 01 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_6 {
+			/*id 6*/
+			mtk,effect-id = <6>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_7 {
+			/*id 7*/
+			mtk,effect-id = <7>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_8 {
+			/*id 8*/
+			mtk,effect-id = <8>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_9 {
+			/*id 9*/
+			mtk,effect-id = <9>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+	};
+};
+
+&i2c7 {
+	status = "ok";
+	aw8697_haptic@5a {
+		compatible = "awinic,aw8697_haptic";
+		reg = <0x5A>;
+		reset-gpio = <&pio 129 0>;
+		irq-gpio = <&pio 22 0>;
+		vib_mode = < 0 >;   /*mode:   RAM mode->0; CONT mode -> 1*/
+		vib_f0_pre = < 1700 >;
+		vib_f0_cali_percen = < 7 >;
+		vib_cont_drv_lev = < 60 >;
+		vib_cont_drv_lvl_ov = < 60 >;
+		vib_cont_td = < 0xef >;
+		vib_cont_zc_thr = < 0x08f8 >;  /*hq 0x08F8 */
+		vib_cont_num_brk = < 3 >;
+		vib_f0_coeff = < 260 >; /*Don't modify it    2.604167*/
+		vib_f0_trace_parameter = < 0x05 0x03 0x02 0x0f >;
+		vib_bemf_config = < 0 0x08 0x03 0xf8 >;
+		vib_sw_brake = < 0x2c >;
+		vib_tset = < 0x1a >;
+		vib_r_spare = < 0x68 >;
+		vib_bstdbg = < 0x30 0xeb 0xd4 0 0 0 >;
+		vib_effect_id_boundary = < 10 >;
+		vib_effect_max = < 197 >;   /*vib_effect_max must bigger than vib_effect_id*/
+		vib_trig_config = < 0 1 0 1 2
+						0 1 0 1 2
+						0 1 0 1 2 >;
+		vib_bst_vol_default = < 0x11 >;
+		vib_bst_vol_ram = < 0x11 >;
+		vib_bst_vol_rtp = < 0x11 >;
+		vib_rtp_time = < 20 20 20 20 20 20 20 20 20000 15000
+				 15000 20000 25000 15000 30000 25000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 20000 20000 20000 20000 20000
+				 20000 20000 20000 20000 20000 >;
+		pinctrl-names = "aw8697_reset_reset","aw8697_reset_active","aw8697_interrupt_active";
+		pinctrl-0 = <&aw8697_reset_low>;
+		pinctrl-1 = <&aw8697_reset_high>;
+		pinctrl-2 = <&aw8697_interrupt>;
+		status = "ok";
+		wf_0 {
+			/*CLICK*/
+			mtk,effect-id = <0>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_1 {
+			/*DOUBLE CLICK*/
+			mtk,effect-id = <1>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [7e 3e];
+			mtk,wf-brake-pattern = [03 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_2 {
+			/*TICK*/
+			mtk,effect-id = <2>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [7e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_3 {
+			/*THUD*/
+			mtk,effect-id = <3>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_4 {
+			/*POP*/
+			mtk,effect-id = <4>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <28000>;
+		};
+		wf_5 {
+			/*HEAVY CLICK*/
+			mtk,effect-id = <5>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [7e 7e 7e];
+			mtk,wf-brake-pattern = [03 03 01 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_6 {
+			/*id 6*/
+			mtk,effect-id = <6>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_7 {
+			/*id 7*/
+			mtk,effect-id = <7>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_8 {
+			/*id 8*/
+			mtk,effect-id = <8>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+		wf_9 {
+			/*id 9*/
+			mtk,effect-id = <9>;
+			mtk,wf-vmax-mv = <3600>;
+			mtk,wf-pattern = [3e 3e];
+			mtk,wf-brake-pattern = [02 01 00 00];
+			mtk,wf-play-rate-us = <20000>;
+		};
+	};
+};
+/* AW8697 Haptic end */
+
+&pio {
+	uart_gpio_enable: uart_gpio_enable@gpio101 {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO101__FUNC_GPIO101>;
+			slew-rate = <1>;
+			bias-disable;
+			output-low;
+		};
+	};
+
+	uart_gpio_disable: uart_gpio_disable@gpio101 {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO101__FUNC_GPIO101>;
+			slew-rate = <1>;
+			bias-disable;
+			output-high;
+		};
+	};
+};
+
+
+&i2c9 {
+	et7480: et7480@42 {
+		status = "ok";
+		compatible = "mediatek,et7480-audioswitch";
+		reg = <0x42>;
+		pinctrl-names = "uart_enable", "uart_disable";
+		pinctrl-0 = <&uart_gpio_enable>;
+		pinctrl-1 = <&uart_gpio_disable>;
+	};
+};
+
+&accdet {
+	/* accdet micbias voltage: 0x09:2.85v 0x08:2.8v 0x07,
+	 * 2.7v;0x05,2.5v;0x02,1.9v
+	 */
+	accdet-mic-vol = <5>;
+
+	/*1:ACC mode, 2:low cost without in bias, 6:low cost with in bias*/
+	accdet-mic-mode = <2>;
+
+	et7480-i2c-handle = <&et7480>;
+};
+
+&pio {
+	rcv_gpio_hight: rcv_gpio_hight {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO54__FUNC_GPIO54>;
+			drive-strength = <2>;
+			bias-disable;
+			output-high;
+		};
+	};
+	rcv_gpio_low: rcv_gpio_low {
+		pins_cmd_dat {
+			pinmux = <PINMUX_GPIO54__FUNC_GPIO54>;
+			drive-strength = <2>;
+			bias-disable;
+			output-low;
+		};
+	};
+};
+
 /* Audio Start */
-&i2c6 {
+&i2c7 {
 	status = "okay";
 	cs35l41_bottom: cs35l41@40 {
 		compatible = "cirrus,cs35l41";
 		#sound-dai-cells = <0>;
 		reg = <0x40>;
 		reset-gpio = <&pio 30 0>;
-		switch-gpio = <&pio 27 0>;
 		interrupt-parent = <&pio>;
 		interrupts = <31 IRQ_TYPE_LEVEL_LOW 31 0>;
 		irq-gpio = <&pio 31 0>;
@@ -546,7 +901,6 @@ USB SWITCH GPIO end */
 		#sound-dai-cells = <0>;
 		reg = <0x42>;
 		reset-gpio = <&pio 30 0>;
-		switch-gpio = <&pio 27 0>;
 		interrupt-parent = <&pio>;
 		interrupts = <113 IRQ_TYPE_LEVEL_LOW 113 0>;
 		irq-gpio = <&pio 113 0>;
@@ -555,6 +909,9 @@ USB SWITCH GPIO end */
 		cirrus,boost-cap-microfarad = <15>;
 		cirrus,asp-sdout-hiz = <1>;
 		cirrus,tuning-has-prefix;
+		pinctrl-names = "rcv_gpio_hight", "rcv_gpio_low";
+		pinctrl-0 = <&rcv_gpio_hight>;
+		pinctrl-1 = <&rcv_gpio_low>;
 		cirrus,gpio-config2 {
 			cirrus,gpio-src-select = <0x4>;
 			cirrus,gpio-output-enable;
@@ -563,8 +920,72 @@ USB SWITCH GPIO end */
 };
 /* Audio End */
 
+
+
+#include "mediatek/cust_mt6893_touch.dtsi"
+/*GAMEKEY start*/
+&gamekey {
+    status = "ok";
+    key_left = <&pio 111 0x00>;
+    hall_left = <&pio 4 0x00>;
+    key_right = <&pio 112 0x00>;
+    hall_right = <&pio 5 0x00>;
+    debounce_time = <5>;        /*unit in ms*/
+    pinctrl-names = "gamekey_active", "gamekey_suspend";
+    pinctrl-0 = <&gk_hall_act &gk_key_act>;
+    pinctrl-1 = <&gk_hall_sup &gk_key_sup>;
+};
+
+&pio {
+	gk_hall_act: gk_hall_act {
+		pins_cmd0_dat {
+			pinmux = <PINMUX_GPIO4__FUNC_GPIO4>;
+			input-enable;
+			bias-disable;
+		};
+
+		pins_cmd1_dat {
+			pinmux = <PINMUX_GPIO5__FUNC_GPIO5>;
+			input-enable;
+			bias-disable;
+		};
+	};
+
+	gk_hall_sup: gk_hall_sup {
+	};
+
+	gk_key_act: gk_key_act {
+		pins_cmd0_dat {
+			pinmux = <PINMUX_GPIO111__FUNC_GPIO111>;
+			input-enable;
+			bias-pull-up;
+			drive-strength = <2>;
+		};
+
+		pins_cmd1_dat {
+			pinmux = <PINMUX_GPIO112__FUNC_GPIO112>;
+			input-enable;
+			bias-pull-up;
+			drive-strength = <2>;
+		};
+	};
+
+	gk_key_sup: gk_key_sup {
+		pins_cmd0_dat {
+			pinmux = <PINMUX_GPIO111__FUNC_GPIO111>;
+			bias-disable;
+		};
+
+		pins_cmd1_dat {
+			pinmux = <PINMUX_GPIO112__FUNC_GPIO112>;
+			bias-disable;
+		};
+	};
+};
+/*GAMEKEY end*/
+
 //ST NFC for Mediateckstart
-&i2c7 {
+&i2c6 {
     st21nfc@08 {
       compatible = "mediatek,nfc";
       reg = <0x08>;
@@ -583,10 +1004,9 @@ USB SWITCH GPIO end */
       pinctrl-2 = <&nfc_int_suspend &nfc_enable_suspend>;
 //         &nfc_clk_req_suspend>;
     };
-       
+        
 };
 //NFC end 
 
-#include "mediatek/cust_mt6891_camera.dtsi"
-//#include <k6891v1_64/cust.dtsi>
+#include "mediatek/ares/cust.dtsi"
 /*End of this file, DO NOT ADD ANYTHING HERE*/

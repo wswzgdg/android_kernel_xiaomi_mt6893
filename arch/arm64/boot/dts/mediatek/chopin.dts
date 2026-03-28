@@ -11,10 +11,11 @@
  GNU General Public License for more details.
  */
 
+/dts-v1/;
+/plugin/;
 #include "mediatek/chopin-mt6891.dtsi"
 
 / {
         model = "CHOPIN";
         compatible = "mediatek,MT6891";
 };
-
