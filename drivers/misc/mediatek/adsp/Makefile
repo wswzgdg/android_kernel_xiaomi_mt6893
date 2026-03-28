@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/adsp/$(MTK_PLATFORM)
 subdir-ccflags-y += -Wformat
 
 ifeq ($(CONFIG_MACH_MT6893), y)

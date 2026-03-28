@@ -1,4 +1,5 @@
 subdir-ccflags-y += -Werror
+subdir-ccflags-y += -I$(srctree)/drivers/gpu/drm/mediatek
 
 mediatek-drm-y := mtk_drm_drv.o \
 		  mtk_disp_color.o \

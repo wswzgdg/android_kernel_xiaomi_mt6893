@@ -1,3 +1,4 @@
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/smi
 #
 # Copyright (C) 2018 MediaTek Inc.
 #

@@ -24,7 +24,7 @@
 #include "clkdbg-mt6885.h"
 #include "clkchk.h"
 #include "clk-fmeter.h"
-#include <clk-mux.h>
+#include "clk-mux.h"
 
 #define DUMP_INIT_STATE		0
 #define CHECK_VCORE_FREQ		1

@@ -28,3 +28,4 @@ ccflags-$(CONFIG_MTK_IOMMU_V2) += -I$(srctree)/drivers/misc/mediatek/include/mt-
 ccflags-$(CONFIG_MTK_CMDQ_MBOX_EXT) += -I$(srctree)/drivers/misc/mediatek/cmdq/mailbox/
 
 obj-y += camera_dip.o
+ccflags-y += -Wno-frame-larger-than

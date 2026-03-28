@@ -1,3 +1,4 @@
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/tee_sanity
 # SPDX-License-Identifier: GPL-2.0
 
 obj-$(CONFIG_MTK_TEE_SANITY) += tee_sanity.o

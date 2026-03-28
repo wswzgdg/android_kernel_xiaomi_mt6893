@@ -15,9 +15,9 @@
 #include <mt-plat/mtk_devinfo.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
-#include <helio-dvfsrc-opp.h>
-#include <helio-dvfsrc-qos.h>
-#include <helio-dvfsrc-mt6853.h>
+#include "helio-dvfsrc-opp.h"
+#include "helio-dvfsrc-qos.h"
+#include "helio-dvfsrc-mt6853.h"
 
 #ifdef CONFIG_MEDIATEK_DRAMC
 #include <dramc.h>

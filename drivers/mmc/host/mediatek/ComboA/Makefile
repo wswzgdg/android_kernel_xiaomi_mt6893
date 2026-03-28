@@ -58,3 +58,5 @@ msdc-y += $(MMC_FOLDER)/autok_dvfs.o
 msdc-$(CONFIG_FPGA_EARLY_PORTING) += $(MMC_FOLDER)/msdc_fpga_io.o
 
 obj-$(CONFIG_MMC_CRYPTO) += sw-cqhci-crypto.o
+subdir-ccflags-y += -I$(srctree)/drivers/mmc/host/mediatek/ComboA
+subdir-ccflags-y += -I$(srctree)/drivers/mmc/host/mediatek/ComboA/mt6885

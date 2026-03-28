@@ -22,7 +22,7 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <mt-plat/sync_write.h>
-#include <mtk_swpm_platform.h>
+#include "../swpm_v1/mt6893/mtk_swpm_platform.h"
 #include <mtk_swpm_sp_interface.h>
 
 
@@ -160,7 +160,7 @@ extern int swpm_interface_manager_init(struct swpm_mem_ref_tbl *ref_tbl,
 extern void swpm_set_enable(unsigned int type, unsigned int enable);
 extern void swpm_set_update_cnt(unsigned int type, unsigned int cnt);
 extern char *swpm_power_rail_to_string(enum power_rail p);
-extern unsigned int swpm_get_avg_power(unsigned int type,
+extern unsigned int swpm_get_avg_power(enum power_rail type,
 				       unsigned int avg_window);
 /* swpm extension ops registry */
 extern int mtk_register_swpm_ops(struct swpm_internal_ops *ops);

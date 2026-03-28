@@ -16,7 +16,7 @@
 #include <linux/version.h>
 #include <linux/seq_file.h>
 
-#include <ion.h>
+#include "../ion.h"
 
 #define BACKTRACE_SIZE 10
 

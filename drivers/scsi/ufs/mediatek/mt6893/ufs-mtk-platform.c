@@ -12,11 +12,11 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/pinctrl/pinctrl.h>
-#include "ufs.h"
-#include "ufshcd.h"
-#include "ufs_quirks.h"
-#include "unipro.h"
-#include "ufs-mtk.h"
+#include "../../ufs.h"
+#include "../../ufshcd.h"
+#include "../../ufs_quirks.h"
+#include "../../unipro.h"
+#include "../../ufs-mtk.h"
 #include "ufs-mtk-platform.h"
 #include "mtk_idle.h"
 #include "mtk_spm_resource_req.h"

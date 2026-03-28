@@ -1,3 +1,4 @@
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/timer/timesync
 #
 # Copyright (C) 2017 MediaTek Inc.
 #

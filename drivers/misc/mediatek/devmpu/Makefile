@@ -20,3 +20,4 @@ ccflags-y += \
 
 obj-$(CONFIG_MTK_DEVMPU) += devmpu.o
 obj-$(CONFIG_MTK_DEVMPU_EMI) += devmpu_emi.o
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/devmpu

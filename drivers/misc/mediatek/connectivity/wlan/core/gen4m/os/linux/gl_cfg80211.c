@@ -2931,7 +2931,7 @@ mtk_cfg80211_testmode_get_sta_statistics(IN struct wiphy
 		DBGLOG(QM, ERROR, "prParams is NULL, data=%p, len=%d\n",
 		       data, len);
 		return -EINVAL;
-	} else if (prParams->aucMacAddr == NULL) {
+	} else {
 		DBGLOG(QM, ERROR,
 		       "prParams->aucMacAddr is NULL, data=%p, len=%d\n",
 		       data, len);
@@ -3340,7 +3340,7 @@ mtk_cfg80211_testmode_get_link_detection(IN struct wiphy
 
 	kalMemZero(&rStatistics, sizeof(rStatistics));
 	kalMemZero(prBugReport, sizeof(struct EVENT_BUG_REPORT));
-	kalMemZero(arBugReport, sizeof(struct EVENT_BUG_REPORT));
+	memset(arBugReport, 0, sizeof(arBugReport));
 
 	rStatus = kalIoctl(prGlueInfo,
 			   wlanoidQueryStatistics,

@@ -15,6 +15,7 @@ ccflags-y += \
 	-I$(PPM_ROOT_DIR)/inc \
 	-I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(CONFIG_MTK_PLATFORM)/include	\
 	-I$(srctree)/drivers/misc/mediatek/base/power/include	\
+-I$(PPM_ROOT_DIR)/src/mach/mt6893 \
 	-I$(srctree)/drivers/misc/mediatek/base/power/$(CONFIG_MTK_PLATFORM)	\
 
 ifneq (,$(findstring 3gear,$(PROJECT_DTB_NAMES)))

@@ -17,8 +17,8 @@
 #include <linux/sysfs.h>
 #include <linux/mutex.h>
 
-#include <helio-dvfsrc-qos.h>
-#include <helio-dvfsrc-opp.h>
+#include "helio-dvfsrc-qos.h"
+#include "helio-dvfsrc-opp.h"
 #include "helio-dvfsrc-ip-v2.h"
 
 static struct pm_qos_request dvfsrc_memory_bw_req;

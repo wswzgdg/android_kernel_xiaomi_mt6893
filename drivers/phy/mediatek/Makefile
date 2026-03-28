@@ -15,3 +15,4 @@ obj-$(CONFIG_MACH_MT6853)		+= phy-mtk-mt6853.o
 obj-$(CONFIG_MACH_MT6785)		+= phy-mtk-mt6785.o
 obj-$(CONFIG_MACH_MT6771)		+= phy-mtk-mt6771.o
 endif
+subdir-ccflags-y += -I$(srctree)/drivers/phy/mediatek

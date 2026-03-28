@@ -1,3 +1,4 @@
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/debug_latch/plat_dbg_info
 #
 # Copyright (C) 2016 MediaTek Inc.
 #
@@ -17,3 +18,4 @@ obj-y += plat_sram_flag.o
 
 # timesync to get boot time
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/timer/timesync
+subdir-ccflags-y += -I/drivers/misc/mediatek/debug_latch/plat_dbg_info

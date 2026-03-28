@@ -62,3 +62,4 @@ obj-y += $(subst ",,$(MTK_PLATFORM))/
 else
 obj-  := dummy.o # avoid build error
 endif
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci

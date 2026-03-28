@@ -2521,7 +2521,7 @@ static int jpeg_probe(struct platform_device *pdev)
 #endif
 #ifdef JPEG_HYBRID_DEC_DRIVER
 
-	memset(_jpeg_hybrid_dec_int_status, 0, HW_CORE_NUMBER);
+	memset(_jpeg_hybrid_dec_int_status, 0, sizeof(_jpeg_hybrid_dec_int_status));
 	for (i = 0; i < HW_CORE_NUMBER; i++) {
 		JPEG_MSG("Request irq %d\n", gJpegqDev.hybriddecIrqId[i]);
 		init_waitqueue_head(&(hybrid_dec_wait_queue[i]));

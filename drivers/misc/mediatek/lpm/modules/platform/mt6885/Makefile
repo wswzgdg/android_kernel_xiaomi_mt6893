@@ -17,3 +17,4 @@ obj-y += mtk_lp_plat_apmcu.o
 obj-y += mtk_lp_plat_apmcu_mbox.o
 
 obj-y += suspend/mt6885_suspend.o
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/lpm/modules/platform/mt6885

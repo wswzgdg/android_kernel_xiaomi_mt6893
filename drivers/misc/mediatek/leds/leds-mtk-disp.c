@@ -481,8 +481,6 @@ static void mtk_leds_shutdown(struct platform_device *pdev)
 	pr_info("Turn off backlight\n");
 
 	for (i = 0; m_leds && i < m_leds->nums; i++) {
-		if (!&(m_leds->leds[i]))
-			continue;
 #ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
 		call_notifier(2, &m_leds->leds[i]);
 #ifdef CONFIG_MTK_AAL_SUPPORT

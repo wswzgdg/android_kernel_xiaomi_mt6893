@@ -31,7 +31,7 @@ TRACE_EVENT(ufs_mtk_event,
 
 #undef TRACE_INCLUDE_PATH
 #undef TRACE_INCLUDE_FILE
-#define TRACE_INCLUDE_PATH .
+#define TRACE_INCLUDE_PATH ../../drivers/scsi/ufs
 #define TRACE_INCLUDE_FILE ufs-mtk-trace
 #include <trace/define_trace.h>
 

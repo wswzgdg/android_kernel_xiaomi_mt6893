@@ -188,8 +188,7 @@ void wlanImageSectionGetCompressFwInfo(IN struct ADAPTER
 		       prTailer->chip_info,
 		       prTailer->eco_code, prTailer->feature_set);
 		kalMemZero(aucBuf, 32);
-		kalStrnCpy(aucBuf, prTailer->ram_version,
-			   sizeof(prTailer->ram_version));
+		strscpy(aucBuf, prTailer->ram_version, sizeof(aucBuf));
 		DBGLOG(INIT, INFO, "date[%s] version[%s]\n",
 		       prTailer->ram_built_date, aucBuf);
 	}
@@ -2032,8 +2031,7 @@ uint32_t wlanGetHarvardTailerInfo(IN struct ADAPTER
 		       prTailers[u4SecIdx].feature_set);
 
 		kalMemZero(aucBuf, 32);
-		kalStrnCpy(aucBuf, prTailers[u4SecIdx].ram_version,
-			   sizeof(prTailers[u4SecIdx].ram_version));
+		strscpy(aucBuf, prTailers[u4SecIdx].ram_version, sizeof(aucBuf));
 		DBGLOG(INIT, INFO, "date[%s] version[%s]\n",
 		       prTailers[u4SecIdx].ram_built_date, aucBuf);
 	}
@@ -2062,8 +2060,7 @@ uint32_t wlanGetConnacTailerInfo(IN struct ADAPTER
 		   sizeof(struct TAILER_COMMON_FORMAT_T));
 
 	kalMemZero(aucBuf, 32);
-	kalStrnCpy(aucBuf, prComTailer->aucRamVersion,
-		   sizeof(prComTailer->aucRamVersion));
+	strscpy(aucBuf, prComTailer->aucRamVersion, sizeof(aucBuf));
 
 	/* Dump image information */
 	DBGLOG(INIT, INFO,

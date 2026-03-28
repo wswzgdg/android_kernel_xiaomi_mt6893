@@ -24,8 +24,8 @@
 
 #include <mt-plat/upmu_common.h>
 #include "helio-dvfsrc-ip-v2.h"
-#include <helio-dvfsrc-opp.h>
-#include <helio-dvfsrc-v6781.h>
+#include "helio-dvfsrc-opp.h"
+#include "helio-dvfsrc-v6781.h"
 #include <mt-plat/mtk_devinfo.h>
 #include <linux/regulator/consumer.h>
 #include "mmdvfs_pmqos.h"

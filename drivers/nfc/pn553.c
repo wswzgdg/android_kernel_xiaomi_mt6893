@@ -405,7 +405,7 @@ long p61_cold_reset(void)
 {
     long ret = 0;
     unsigned int loop = 0x03;
-    struct file filp = {0};
+    struct file filp = {};
     int timeout = 2000;    /* 2s timeout :NCI cmd timeout */
     unsigned long tempJ = msecs_to_jiffies(timeout);
     uint8_t cmd_ese_cold_reset[] = { 0x2F, 0x1E, 0x00 };

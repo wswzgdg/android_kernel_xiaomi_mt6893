@@ -1404,7 +1404,7 @@ static void soc3_0_DumpPcLrLog(struct ADAPTER *prAdapter)
 	DBGLOG(HAL, LOUD,
 		"Host_CSR - dump PC log / LR log");
 
-	memset(log, 0, HANG_PC_LOG_NUM);
+	memset(log, 0, sizeof(log));
 
 	/* PC log
 	* dbg_pc_log_sel	Write	0x1806_0090 [7:2]	6'h20
@@ -1499,7 +1499,7 @@ static void soc3_0_DumpN10CoreReg(struct ADAPTER *prAdapter)
 	DBGLOG(HAL, LOUD,
 		"Host_CSR - read N10 core register");
 
-	memset(log, 0, HANG_N10_CORE_LOG_NUM);
+	memset(log, 0, sizeof(log));
 
 /*
 *	[31:26]: gpr_index_sel (set different sets of gpr) = 0
@@ -1542,7 +1542,7 @@ static void soc3_0_DumpOtherCr(struct ADAPTER *prAdapter)
 	DBGLOG(HAL, LOUD,
 		"Host_CSR - mailbox and other CRs");
 
-	memset(log, 0, HANG_OTHER_LOG_TOTAL);
+	memset(log, 0, sizeof(log));
 
 	u4Cr = 0x18060260;
 	for (i = 0; i < HANG_MAIL_BOX_LOG_NUM; i++) {
@@ -1571,7 +1571,7 @@ static void soc3_0_DumpSpecifiedWfTop(struct ADAPTER *prAdapter)
 	DBGLOG(HAL, LOUD,
 		"Host_CSR - specified WF TOP monflg on");
 
-	memset(log, 0, HANG_TOP_LOG_NUM);
+	memset(log, 0, sizeof(log));
 
 /* 0x1806009C[28]=1	write	enable wf_mcu_misc */
 

@@ -1,3 +1,4 @@
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/typec/u3_switch
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/pmic/include
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/$(MTK_PLATFORM)
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include

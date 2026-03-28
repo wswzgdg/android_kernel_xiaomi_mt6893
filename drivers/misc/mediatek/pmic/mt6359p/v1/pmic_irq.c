@@ -85,7 +85,7 @@ irqreturn_t legacy_pmic_int_handler(int irq, void *data)
 /*
  * PMIC Interrupt service
  */
-void pmic_enable_interrupt(enum PMIC_IRQ_ENUM intNo, unsigned int en, char *str)
+void pmic_enable_interrupt(unsigned int intNo, unsigned int en, char *str)
 {
 	int ret = 0;
 	unsigned int irq = 0;
@@ -131,7 +131,7 @@ void pmic_enable_interrupt(enum PMIC_IRQ_ENUM intNo, unsigned int en, char *str)
 		__func__, intNo, en, desc ? desc->depth : -1);
 }
 
-void pmic_register_interrupt_callback(enum PMIC_IRQ_ENUM intNo,
+void pmic_register_interrupt_callback(unsigned int intNo,
 		void (EINT_FUNC_PTR) (void))
 {
 	struct legacy_pmic_callback *pmic_cb = &pmic_cbs[intNo];

@@ -40,7 +40,7 @@ enum boot_mode_t {
 #define BOOT_MODE_SYSFS_ATTR    "boot_mode"
 #define BOOT_TYPE_SYSFS_ATTR    "boot_type"
 
-extern enum boot_mode_t get_boot_mode(void);
+extern unsigned int get_boot_mode(void);
 extern unsigned int get_boot_type(void);
 extern bool is_meta_mode(void);
 extern bool is_advanced_meta_mode(void);

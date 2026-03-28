@@ -11,12 +11,12 @@
  * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
  */
 
-#include <audio_ringbuf.h>
+#include "audio_ringbuf.h"
 
 #include <linux/string.h>
 #include <linux/vmalloc.h>
 
-#include <audio_assert.h>
+#include "audio_assert.h"
 
 
 

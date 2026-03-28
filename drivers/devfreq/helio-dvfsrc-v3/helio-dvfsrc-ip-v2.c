@@ -24,8 +24,8 @@
 #include <ext_wd_drv.h>
 #endif
 
-#include <helio-dvfsrc-opp.h>
-#include <helio-dvfsrc-ip-v2.h>
+#include "helio-dvfsrc-opp.h"
+#include "helio-dvfsrc-ip-v2.h"
 
 #include <spm/mtk_vcore_dvfs.h>
 

@@ -350,22 +350,17 @@ static void set_shutter(kal_uint32 shutter)
 	LOG_INF("Exit! shutter =%d, framelength =%d\n", shutter, imgsensor.frame_length);
 }
 
-#define FACTOR 992.0f
+#define FACTOR 992
+#define MAX_DIG_GAIN_X1024 16374
 static kal_uint32 digital_gain_calc(kal_uint16 aaa_gain)
 {
-	float real_dig_gain = 1.0f;//MIN Dgain
-	kal_uint32 reg_dig_gain = 1024;//1024 = 1x
+	kal_uint32 reg_dig_gain;
 
-	real_dig_gain = aaa_gain / FACTOR;
+	reg_dig_gain = DIV_ROUND_CLOSEST((u32)aaa_gain * 1024, FACTOR);
+	if (reg_dig_gain > MAX_DIG_GAIN_X1024)
+		reg_dig_gain = MAX_DIG_GAIN_X1024;
 
-	if (real_dig_gain > 15.99f)//Max digital gain
-	{
-		real_dig_gain = 15.99f;
-	}
-
-	reg_dig_gain = (kal_uint32)(real_dig_gain * 1024) << 6;
-
-	return reg_dig_gain;
+	return reg_dig_gain << 6;
 }
 
 #if 0

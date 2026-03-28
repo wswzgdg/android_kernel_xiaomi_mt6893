@@ -1,4 +1,5 @@
 #
+subdir-ccflags-y += -I$(PPM_ROOT_DIR)/src/mach/$(MTK_PLATFORM)
 # Copyright (C) 2015 MediaTek Inc.
 #
 # This program is free software: you can redistribute it and/or modify

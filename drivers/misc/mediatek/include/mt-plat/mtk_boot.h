@@ -24,7 +24,7 @@ enum meta_com_type {
 	META_USB_COM
 };
 
-extern enum meta_com_type get_meta_com_type(void);
+extern unsigned int get_meta_com_type(void);
 extern unsigned int get_meta_com_id(void);
 extern unsigned int get_meta_uart_port(void);
 

@@ -12,8 +12,8 @@
 #ifndef _UFS_MTK_PLATFORM_H
 #define _UFS_MTK_PLATFORM_H
 
-#include "ufs.h"
-#include "ufshcd.h"
+#include "../../ufs.h"
+#include "../../ufshcd.h"
 
 /*
  * Platform dependent quirks

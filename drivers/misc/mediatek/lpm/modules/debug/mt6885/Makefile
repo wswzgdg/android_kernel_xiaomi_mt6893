@@ -23,3 +23,4 @@ mt6885_cpupm_dbg-y += mtk_idle_procfs_state.o
 mt6885_cpupm_dbg-y += mtk_idle_procfs_cpc.o
 mt6885_cpupm_dbg-y += mtk_idle_procfs_profile.o
 mt6885_cpupm_dbg-y += mtk_idle_procfs_control.o
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/lpm/modules/debug/mt6885

@@ -103,7 +103,7 @@ Bit14-Bit0: Number of Pules
 #define RECHECK_DELAY		40000
 #define MAX_RECHECK_COUNT	4
 
-static const enum power_supply_type const xmusb350_apsd_results[] = {
+static const enum power_supply_type xmusb350_apsd_results[] = {
 	POWER_SUPPLY_TYPE_UNKNOWN,
 	POWER_SUPPLY_TYPE_USB,
 	POWER_SUPPLY_TYPE_USB_CDP,
@@ -1492,7 +1492,7 @@ static irqreturn_t xmusb350_interrupt(int irq, void *dev_id)
 
 static int load_fw(struct xmusb350_charger *chip, const char *fn, bool force)
 {
-	int rc;
+	int rc = 0;
 	int i;
 	int pos = 0;
 	const struct firmware *fw = NULL;

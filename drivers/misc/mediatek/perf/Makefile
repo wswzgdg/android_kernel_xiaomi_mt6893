@@ -1,3 +1,4 @@
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/perf
 #
 # Copyright (C) 2018 MediaTek Inc.
 #

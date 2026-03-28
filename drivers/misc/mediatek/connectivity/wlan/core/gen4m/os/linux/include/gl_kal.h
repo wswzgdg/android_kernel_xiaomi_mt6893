@@ -853,7 +853,7 @@ static inline void kalCfg80211ScanDone(struct cfg80211_scan_request *request,
 
 /* Zero specific memory block */
 #define kalMemZero(pvAddr, u4Size)  \
-	memset(pvAddr, 0, u4Size)
+	memset((pvAddr), 0, (u4Size))
 
 /* Move memory block with specific size */
 #define kalMemMove(pvDst, pvSrc, u4Size)  \

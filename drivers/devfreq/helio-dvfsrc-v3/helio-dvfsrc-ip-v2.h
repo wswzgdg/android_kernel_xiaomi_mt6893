@@ -13,10 +13,10 @@
 
 #ifndef __HELIO_DVFSRC_IP_V2_H
 #define __HELIO_DVFSRC_IP_V2_H
-#include <helio-dvfsrc-qos.h>
-#include <mtk_dvfsrc_reg_v2.h>
+#include "helio-dvfsrc-qos.h"
+#include "mtk_dvfsrc_reg_v2.h"
 #if defined(DVFSRC_SMC_CONTROL)
-#include <mtk_dvfsrc_smc_reg.h>
+#include "mtk_dvfsrc_smc_reg.h"
 #endif
 
 #define DVFSRC_TIMEOUT          1000

@@ -26,7 +26,7 @@
 #ifdef MDP_COMMON_ENG_SUPPORT
 #include "mdp_engine_common.h"
 #else
-#include "mdp_engine.h"
+#include "mt6885/mdp_engine.h"
 #endif
 
 #define CMDQ_SPECIAL_SUBSYS_ADDR (99)
