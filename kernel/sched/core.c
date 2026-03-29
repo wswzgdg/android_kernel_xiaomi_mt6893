@@ -5368,6 +5368,53 @@ static void __setscheduler_params(struct task_struct *p,
 	set_load_weight(p);
 }
 
+static int sched_uclamp_validate(struct task_struct *p,
+				 const struct sched_attr *attr)
+{
+	unsigned int util_min = p->uclamp[UCLAMP_MIN].value;
+	unsigned int util_max = p->uclamp[UCLAMP_MAX].value;
+
+	if (!(attr->sched_flags & SCHED_FLAG_UTIL_CLAMP))
+		return 0;
+
+	if ((attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MIN) &&
+	    attr->sched_util_min > SCHED_CAPACITY_SCALE)
+		return -EINVAL;
+
+	if ((attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MAX) &&
+	    attr->sched_util_max > SCHED_CAPACITY_SCALE)
+		return -EINVAL;
+
+	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MIN)
+		util_min = attr->sched_util_min;
+
+	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MAX)
+		util_max = attr->sched_util_max;
+
+	if (util_min > util_max)
+		return -EINVAL;
+
+	return 0;
+}
+
+static void __setscheduler_uclamp(struct task_struct *p,
+				  const struct sched_attr *attr)
+{
+	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MIN) {
+		p->uclamp[UCLAMP_MIN].user_defined = true;
+		uclamp_group_get(p, NULL, &p->uclamp[UCLAMP_MIN],
+				 UCLAMP_MIN,
+				 find_fit_capacity(attr->sched_util_min));
+	}
+
+	if (attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MAX) {
+		p->uclamp[UCLAMP_MAX].user_defined = true;
+		uclamp_group_get(p, NULL, &p->uclamp[UCLAMP_MAX],
+				 UCLAMP_MAX,
+				 find_fit_capacity(attr->sched_util_max));
+	}
+}
+
 /* Actually do priority change: must hold pi & rq lock. */
 static void __setscheduler(struct rq *rq, struct task_struct *p,
 			   const struct sched_attr *attr, bool keep_boost)
@@ -5395,6 +5442,8 @@ static void __setscheduler(struct rq *rq, struct task_struct *p,
 	else
 		p->sched_class = &fair_sched_class;
 #endif
+
+	__setscheduler_uclamp(p, attr);
 }
 
 /*
@@ -5442,8 +5491,13 @@ recheck:
 	}
 
 	if (attr->sched_flags &
-		~(SCHED_FLAG_RESET_ON_FORK | SCHED_FLAG_RECLAIM))
+		~(SCHED_FLAG_RESET_ON_FORK | SCHED_FLAG_RECLAIM |
+		  SCHED_FLAG_UTIL_CLAMP))
 		return -EINVAL;
+
+	retval = sched_uclamp_validate(p, attr);
+	if (retval)
+		return retval;
 
 	/*
 	 * Valid priorities for SCHED_FIFO and SCHED_RR are
@@ -5542,6 +5596,14 @@ recheck:
 		if (rt_policy(policy) && attr->sched_priority != p->rt_priority)
 			goto change;
 		if (dl_policy(policy) && dl_param_changed(p, attr))
+			goto change;
+		if ((attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MIN) &&
+		    find_fit_capacity(attr->sched_util_min) !=
+			p->uclamp[UCLAMP_MIN].value)
+			goto change;
+		if ((attr->sched_flags & SCHED_FLAG_UTIL_CLAMP_MAX) &&
+		    find_fit_capacity(attr->sched_util_max) !=
+			p->uclamp[UCLAMP_MAX].value)
 			goto change;
 
 		p->sched_reset_on_fork = reset_on_fork;
@@ -6059,6 +6121,12 @@ SYSCALL_DEFINE4(sched_getattr, pid_t, pid, struct sched_attr __user *, uattr,
 	attr.sched_policy = p->policy;
 	if (p->sched_reset_on_fork)
 		attr.sched_flags |= SCHED_FLAG_RESET_ON_FORK;
+	if (p->uclamp[UCLAMP_MIN].user_defined)
+		attr.sched_flags |= SCHED_FLAG_UTIL_CLAMP_MIN;
+	if (p->uclamp[UCLAMP_MAX].user_defined)
+		attr.sched_flags |= SCHED_FLAG_UTIL_CLAMP_MAX;
+	attr.sched_util_min = p->uclamp[UCLAMP_MIN].value;
+	attr.sched_util_max = p->uclamp[UCLAMP_MAX].value;
 	if (task_has_dl_policy(p))
 		__getparam_dl(p, &attr);
 	else if (task_has_rt_policy(p))
