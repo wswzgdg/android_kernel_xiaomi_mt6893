@@ -3741,18 +3741,15 @@ static void binder_transaction(struct binder_proc *proc,
 			goto err_dead_binder;
 		}
 		e->to_node = target_node->debug_id;
-<<<<<<< HEAD
 #ifdef BINDER_WATCHDOG
 		strncpy(e->service, target_node->name, MAX_SERVICE_NAME_LEN);
 #endif
-=======
 		if (WARN_ON(proc == target_proc)) {
 			return_error = BR_FAILED_REPLY;
 			return_error_param = -EINVAL;
 			return_error_line = __LINE__;
 			goto err_invalid_target_handle;
 		}
->>>>>>> f40f289b96bf (binder: Prevent context manager from incrementing ref 0)
 		if (security_binder_transaction(proc->tsk,
 						target_proc->tsk) < 0) {
 			return_error = BR_FAILED_REPLY;
