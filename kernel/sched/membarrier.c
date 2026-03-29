@@ -19,6 +19,7 @@
 #include <linux/tick.h>
 #include <linux/cpumask.h>
 #include <linux/atomic.h>
+#include <linux/sync_core.h>
 
 #include "sched.h"	/* for cpu_rq(). */
 
@@ -26,23 +27,38 @@
  * Bitmask made from a "or" of all commands within enum membarrier_cmd,
  * except MEMBARRIER_CMD_QUERY.
  */
+#ifdef CONFIG_ARCH_HAS_MEMBARRIER_SYNC_CORE
+#define MEMBARRIER_PRIVATE_EXPEDITED_SYNC_CORE_BITMASK	\
+	(MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE		\
+	| MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE)
+#else
+#define MEMBARRIER_PRIVATE_EXPEDITED_SYNC_CORE_BITMASK	0
+#endif
+
 #define MEMBARRIER_CMD_BITMASK	\
 	(MEMBARRIER_CMD_SHARED | MEMBARRIER_CMD_PRIVATE_EXPEDITED	\
-	| MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED)
+	| MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED		\
+	| MEMBARRIER_PRIVATE_EXPEDITED_SYNC_CORE_BITMASK)
 
 static void ipi_mb(void *info)
 {
 	smp_mb();	/* IPIs should be serializing but paranoid. */
 }
 
-static int membarrier_private_expedited(void)
+static void ipi_sync_core(void *info)
+{
+	smp_mb();	/* IPIs should be serializing but paranoid. */
+	sync_core_before_usermode();
+}
+
+static int membarrier_private_expedited(smp_call_func_t ipi_func,
+					unsigned int ready_state)
 {
 	int cpu;
 	bool fallback = false;
 	cpumask_var_t tmpmask;
 
-	if (!(atomic_read(&current->mm->membarrier_state)
-			& MEMBARRIER_STATE_PRIVATE_EXPEDITED_READY))
+	if (!(atomic_read(&current->mm->membarrier_state) & ready_state))
 		return -EPERM;
 
 	if (num_online_cpus() == 1)
@@ -84,13 +100,13 @@ static int membarrier_private_expedited(void)
 			if (!fallback)
 				__cpumask_set_cpu(cpu, tmpmask);
 			else
-				smp_call_function_single(cpu, ipi_mb, NULL, 1);
+				smp_call_function_single(cpu, ipi_func, NULL, 1);
 		}
 		rcu_read_unlock();
 	}
 	if (!fallback) {
 		preempt_disable();
-		smp_call_function_many(tmpmask, ipi_mb, NULL, 1);
+		smp_call_function_many(tmpmask, ipi_func, NULL, 1);
 		preempt_enable();
 		free_cpumask_var(tmpmask);
 	}
@@ -120,6 +136,22 @@ static void membarrier_register_private_expedited(void)
 		return;
 	atomic_or(MEMBARRIER_STATE_PRIVATE_EXPEDITED_READY,
 			&mm->membarrier_state);
+}
+
+static int membarrier_register_private_expedited_sync_core(void)
+{
+	struct task_struct *p = current;
+	struct mm_struct *mm = p->mm;
+
+	if (!IS_ENABLED(CONFIG_ARCH_HAS_MEMBARRIER_SYNC_CORE))
+		return -EINVAL;
+	if (atomic_read(&mm->membarrier_state) &
+		    MEMBARRIER_STATE_PRIVATE_EXPEDITED_SYNC_CORE_READY)
+		return 0;
+	atomic_or(MEMBARRIER_STATE_PRIVATE_EXPEDITED_SYNC_CORE |
+		  MEMBARRIER_STATE_PRIVATE_EXPEDITED_SYNC_CORE_READY,
+		  &mm->membarrier_state);
+	return 0;
 }
 
 /**
@@ -170,10 +202,18 @@ SYSCALL_DEFINE2(membarrier, int, cmd, int, flags)
 			synchronize_sched();
 		return 0;
 	case MEMBARRIER_CMD_PRIVATE_EXPEDITED:
-		return membarrier_private_expedited();
+		return membarrier_private_expedited(ipi_mb,
+				MEMBARRIER_STATE_PRIVATE_EXPEDITED_READY);
 	case MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED:
 		membarrier_register_private_expedited();
 		return 0;
+	case MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE:
+		if (!IS_ENABLED(CONFIG_ARCH_HAS_MEMBARRIER_SYNC_CORE))
+			return -EINVAL;
+		return membarrier_private_expedited(ipi_sync_core,
+				MEMBARRIER_STATE_PRIVATE_EXPEDITED_SYNC_CORE_READY);
+	case MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE:
+		return membarrier_register_private_expedited_sync_core();
 	default:
 		return -EINVAL;
 	}

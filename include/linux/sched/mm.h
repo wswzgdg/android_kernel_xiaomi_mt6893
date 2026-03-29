@@ -7,6 +7,7 @@
 #include <linux/sched.h>
 #include <linux/mm_types.h>
 #include <linux/gfp.h>
+#include <linux/sync_core.h>
 
 /*
  * Routines for handling mm_structs
@@ -243,14 +244,30 @@ static inline void memalloc_noreclaim_restore(unsigned int flags)
 enum {
 	MEMBARRIER_STATE_PRIVATE_EXPEDITED_READY	= (1U << 0),
 	MEMBARRIER_STATE_SWITCH_MM			= (1U << 1),
+	MEMBARRIER_STATE_PRIVATE_EXPEDITED_SYNC_CORE_READY	= (1U << 2),
+	MEMBARRIER_STATE_PRIVATE_EXPEDITED_SYNC_CORE		= (1U << 3),
 };
 
 static inline void membarrier_execve(struct task_struct *t)
 {
 	atomic_set(&t->mm->membarrier_state, 0);
 }
+
+static inline void membarrier_mm_sync_core_before_usermode(struct mm_struct *mm)
+{
+	if (current->mm != mm)
+		return;
+	if (!(atomic_read(&mm->membarrier_state) &
+	      MEMBARRIER_STATE_PRIVATE_EXPEDITED_SYNC_CORE))
+		return;
+	sync_core_before_usermode();
+}
 #else
 static inline void membarrier_execve(struct task_struct *t)
+{
+}
+
+static inline void membarrier_mm_sync_core_before_usermode(struct mm_struct *mm)
 {
 }
 #endif
