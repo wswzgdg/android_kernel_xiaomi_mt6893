@@ -279,11 +279,11 @@ static struct bpf_dtab_netdev *__dev_map_hash_lookup_elem_dtab(struct bpf_map *m
 	return NULL;
 }
 
-struct bpf_dtab_netdev *__dev_map_hash_lookup_elem(struct bpf_map *map, u32 key)
+struct net_device *__dev_map_hash_lookup_elem(struct bpf_map *map, u32 key)
 {
 	struct bpf_dtab_netdev *dev = __dev_map_hash_lookup_elem_dtab(map, key);
 
-	return dev;
+	return dev ? dev->dev : NULL;
 }
 
 static int dev_map_hash_get_next_key(struct bpf_map *map, void *key,
@@ -373,7 +373,7 @@ void __dev_map_flush(struct bpf_map *map)
  * update happens in parallel here a dev_put wont happen until after reading the
  * ifindex.
  */
-struct bpf_dtab_netdev *__dev_map_lookup_elem(struct bpf_map *map, u32 key)
+struct net_device *__dev_map_lookup_elem(struct bpf_map *map, u32 key)
 {
 	struct bpf_dtab *dtab = container_of(map, struct bpf_dtab, map);
 	struct bpf_dtab_netdev *dev;
@@ -382,21 +382,21 @@ struct bpf_dtab_netdev *__dev_map_lookup_elem(struct bpf_map *map, u32 key)
 		return NULL;
 
 	dev = READ_ONCE(dtab->netdev_map[key]);
-	return dev;
+	return dev ? dev->dev : NULL;
 }
 
 static void *dev_map_lookup_elem(struct bpf_map *map, void *key)
 {
-	struct bpf_dtab_netdev *dst = __dev_map_lookup_elem(map, *(u32 *)key);
+	struct net_device *dst = __dev_map_lookup_elem(map, *(u32 *)key);
 
-	return dst ? &dst->dev->ifindex : NULL;
+	return dst ? &dst->ifindex : NULL;
 }
 
 static void *dev_map_hash_lookup_elem(struct bpf_map *map, void *key)
 {
-	struct bpf_dtab_netdev *dst = __dev_map_hash_lookup_elem(map, *(u32 *)key);
+	struct net_device *dst = __dev_map_hash_lookup_elem(map, *(u32 *)key);
 
-	return dst ? &dst->dev->ifindex : NULL;
+	return dst ? &dst->ifindex : NULL;
 }
 
 static void dev_map_flush_old(struct bpf_dtab_netdev *dev)

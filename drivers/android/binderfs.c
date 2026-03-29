@@ -530,13 +530,10 @@ void binderfs_remove_file(struct dentry *dentry)
 	inode_unlock(parent_inode);
 }
 
-struct dentry *binderfs_create_file(struct dentry *parent, const char *name,
-				    const struct file_operations *fops,
-				    void *data)
-static struct dentry *binderfs_create_file(struct dentry *parent,
-					   const char *name,
-					   const struct file_operations *fops,
-					   void *data)
+struct dentry *binderfs_create_file(struct dentry *parent,
+				  const char *name,
+				  const struct file_operations *fops,
+				  void *data)
 {
 	struct dentry *dentry;
 	struct inode *new_inode, *parent_inode;
@@ -639,14 +636,9 @@ static int init_binder_logs(struct super_block *sb)
 {
 	struct dentry *binder_logs_root_dir, *dentry, *proc_log_dir;
 	struct binderfs_info *info;
-static int init_binder_logs(struct super_block *sb)
-{
-	struct dentry *binder_logs_root_dir, *dentry, *proc_log_dir;
-	struct binderfs_info *info;
 	int ret = 0;
 
-	binder_logs_root_dir = binderfs_create_dir(sb->s_root,
-						   "binder_logs");
+	binder_logs_root_dir = binderfs_create_dir(sb->s_root, "binder_logs");
 	if (IS_ERR(binder_logs_root_dir)) {
 		ret = PTR_ERR(binder_logs_root_dir);
 		goto out;
@@ -673,8 +665,7 @@ static int init_binder_logs(struct super_block *sb)
 		goto out;
 	}
 
-	dentry = binderfs_create_file(binder_logs_root_dir,
-				      "transaction_log",
+	dentry = binderfs_create_file(binder_logs_root_dir, "transaction_log",
 				      &binder_transaction_log_fops,
 				      &binder_transaction_log);
 	if (IS_ERR(dentry)) {
@@ -682,8 +673,7 @@ static int init_binder_logs(struct super_block *sb)
 		goto out;
 	}
 
-	dentry = binderfs_create_file(binder_logs_root_dir,
-				      "failed_transaction_log",
+	dentry = binderfs_create_file(binder_logs_root_dir, "failed_transaction_log",
 				      &binder_transaction_log_fops,
 				      &binder_transaction_log_failed);
 	if (IS_ERR(dentry)) {
@@ -696,18 +686,7 @@ static int init_binder_logs(struct super_block *sb)
 		ret = PTR_ERR(proc_log_dir);
 		goto out;
 	}
-	info = sb->s_fs_info;
-	info->proc_log_dir = proc_log_dir;
-	if (IS_ERR(dentry))
-		ret = PTR_ERR(dentry);
-		goto out;
-	}
 
-	proc_log_dir = binderfs_create_dir(binder_logs_root_dir, "proc");
-	if (IS_ERR(proc_log_dir)) {
-		ret = PTR_ERR(proc_log_dir);
-		goto out;
-	}
 	info = sb->s_fs_info;
 	info->proc_log_dir = proc_log_dir;
 

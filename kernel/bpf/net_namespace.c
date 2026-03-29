@@ -31,8 +31,9 @@ static void netns_bpf_run_array_detach(struct net *net,
 {
 	struct bpf_prog_array *run_array;
 
-	run_array = rcu_replace_pointer(net->bpf.run_array[type], NULL,
+	run_array = rcu_dereference_protected(net->bpf.run_array[type],
 					lockdep_is_held(&netns_bpf_mutex));
+	rcu_assign_pointer(net->bpf.run_array[type], NULL);
 	bpf_prog_array_free(run_array);
 }
 
@@ -203,7 +204,7 @@ int netns_bpf_prog_attach(const union bpf_attr *attr, struct bpf_prog *prog)
 	struct net *net;
 	int ret;
 
-	if (attr->target_fd || attr->attach_flags || attr->replace_bpf_fd)
+	if (attr->target_fd || attr->attach_flags)
 		return -EINVAL;
 	type = to_netns_bpf_attach_type(attr->attach_type);
 	if (type < 0)
@@ -411,7 +412,7 @@ static int __net_init netns_bpf_pernet_init(struct net *net)
 	return 0;
 }
 
-static void __net_exit netns_bpf_pernet_pre_exit(struct net *net)
+static void __net_exit netns_bpf_pernet_exit(struct net *net)
 {
 	enum netns_bpf_attach_type type;
 	struct bpf_netns_link *net_link;
@@ -427,7 +428,7 @@ static void __net_exit netns_bpf_pernet_pre_exit(struct net *net)
 }
 
 static struct pernet_operations netns_bpf_pernet_ops __net_initdata = {
-	.init = netns_bpf_pernet_init,	.pre_exit = netns_bpf_pernet_pre_exit,
+	.init = netns_bpf_pernet_init,	.exit = netns_bpf_pernet_exit,
 };
 
 static int __init netns_bpf_init(void)

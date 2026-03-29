@@ -17,7 +17,7 @@
 #ifdef CONFIG_MTK_AEE_FEATURE
 #include <mt-plat/aee.h>
 #endif
-#include "vow.h"
+#include "ver02/vow.h"
 
 #ifdef CONFIG_MTK_AEE_FEATURE
 #define VOW_ASSERT(exp) \

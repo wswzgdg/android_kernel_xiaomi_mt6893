@@ -265,12 +265,13 @@ void bpf_cgroup_storage_release(struct bpf_prog *prog, struct bpf_map *map);
        __ret;								       \
 })
 
-#define BPF_CGROUP_RUN_PROG_SYSCTL(head, table, write)			       \
+#define BPF_CGROUP_RUN_PROG_SYSCTL(head, table, write, buf, pcount, ppos, new_buf) \
 ({									       \
 	int __ret = 0;							       \
 	if (cgroup_bpf_enabled)						       \
 		__ret = __cgroup_bpf_run_filter_sysctl(head, table, write,     \
-						       BPF_CGROUP_SYSCTL);     \
+						       buf, pcount, ppos, new_buf, \
+						       BPF_CGROUP_SYSCTL);      \
 	__ret;								       \
 })
 
@@ -341,7 +342,7 @@ static inline int cgroup_bpf_inherit(struct cgroup *cgrp) { return 0; }
 #define BPF_CGROUP_RUN_PROG_UDP6_RECVMSG_LOCK(sk, uaddr) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_SOCK_OPS(sock_ops) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_DEVICE_CGROUP(type,major,minor,access) ({ 0; })
-#define BPF_CGROUP_RUN_PROG_SYSCTL(head, table, write) ({ 0; })
+#define BPF_CGROUP_RUN_PROG_SYSCTL(head, table, write, buf, pcount, ppos, new_buf) ({ 0; })
 #define BPF_CGROUP_GETSOCKOPT_MAX_OPTLEN(optlen) ({ 0; })
 #define BPF_CGROUP_RUN_PROG_GETSOCKOPT(sock, level, optname, optval, \
 				       optlen, max_optlen, retval) ({ retval; })

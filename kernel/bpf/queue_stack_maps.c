@@ -42,26 +42,20 @@ static bool queue_stack_map_is_full(struct bpf_queue_stack *qs)
 	return head == qs->tail;
 }
 
-/* Called from syscall */
-static int queue_stack_map_alloc_check(union bpf_attr *attr)
+static struct bpf_map *queue_stack_map_alloc(union bpf_attr *attr)
 {
+	int ret, numa_node = bpf_map_attr_numa_node(attr);
+
 	/* check sanity of attributes */
 	if (attr->max_entries == 0 || attr->key_size != 0 ||
 	    attr->map_flags & ~QUEUE_STACK_CREATE_FLAG_MASK)
-		return -EINVAL;
+		return ERR_PTR(-EINVAL);
 
 	if (attr->value_size > KMALLOC_MAX_SIZE)
 		/* if value_size is bigger, the user space won't be able to
 		 * access the elements.
 		 */
-		return -E2BIG;
-
-	return 0;
-}
-
-static struct bpf_map *queue_stack_map_alloc(union bpf_attr *attr)
-{
-	int ret, numa_node = bpf_map_attr_numa_node(attr);
+		return ERR_PTR(-E2BIG);
 	struct bpf_queue_stack *qs;
 	u32 size, value_size;
 	u64 queue_size, cost;
@@ -262,27 +256,19 @@ static int queue_stack_map_get_next_key(struct bpf_map *map, void *key,
 }
 
 const struct bpf_map_ops queue_map_ops = {
-	.map_alloc_check = queue_stack_map_alloc_check,
 	.map_alloc = queue_stack_map_alloc,
 	.map_free = queue_stack_map_free,
 	.map_lookup_elem = queue_stack_map_lookup_elem,
 	.map_update_elem = queue_stack_map_update_elem,
 	.map_delete_elem = queue_stack_map_delete_elem,
-	.map_push_elem = queue_stack_map_push_elem,
-	.map_pop_elem = queue_map_pop_elem,
-	.map_peek_elem = queue_map_peek_elem,
 	.map_get_next_key = queue_stack_map_get_next_key,
 };
 
-const struct bpf_map_ops stack_map_ops = {
-	.map_alloc_check = queue_stack_map_alloc_check,
+const struct bpf_map_ops stack_queue_map_ops = {
 	.map_alloc = queue_stack_map_alloc,
 	.map_free = queue_stack_map_free,
 	.map_lookup_elem = queue_stack_map_lookup_elem,
 	.map_update_elem = queue_stack_map_update_elem,
 	.map_delete_elem = queue_stack_map_delete_elem,
-	.map_push_elem = queue_stack_map_push_elem,
-	.map_pop_elem = stack_map_pop_elem,
-	.map_peek_elem = stack_map_peek_elem,
 	.map_get_next_key = queue_stack_map_get_next_key,
 };

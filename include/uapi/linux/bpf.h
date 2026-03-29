@@ -126,6 +126,8 @@ enum bpf_map_type {
 	BPF_MAP_TYPE_SOCKMAP,
 	BPF_MAP_TYPE_CPUMAP,
 	BPF_MAP_TYPE_CGROUP_STORAGE = 20,
+	BPF_MAP_TYPE_QUEUE = 22,
+	BPF_MAP_TYPE_STACK,
 	BPF_MAP_TYPE_DEVMAP_HASH = 25,
 };
 
@@ -188,6 +190,18 @@ enum bpf_link_type {
 	BPF_LINK_TYPE_NETNS = 5,
 
 	MAX_BPF_LINK_TYPE,
+};
+
+struct bpf_link_info {
+	__u32 type;
+	__u32 id;
+	__u32 prog_id;
+	union {
+		struct {
+			__u32 netns_ino;
+			__u32 attach_type;
+		} netns;
+	};
 };
 
 /* cgroup-bpf attach flags used in BPF_PROG_ATTACH command
@@ -378,6 +392,13 @@ union bpf_attr {
 		__u32		btf_log_size;
 		__u32		btf_log_level;
 	};
+
+	struct { /* struct used by BPF_LINK_CREATE command */
+		__u32		prog_fd;
+		__u32		target_fd;
+		__u32		attach_type;
+		__u32		flags;
+	} link_create;
 } __attribute__((aligned(8)));
 
 /* BPF helper function descriptions:

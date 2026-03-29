@@ -299,13 +299,13 @@ struct bpf_cgroup_storage *bpf_cgroup_storage_alloc(struct bpf_prog *prog,
 	pages = round_up(sizeof(struct bpf_cgroup_storage) +
 			 sizeof(struct bpf_storage_buffer) +
 			 map->value_size, PAGE_SIZE) >> PAGE_SHIFT;
-	if (bpf_map_charge_memlock(map, pages))
+	if (bpf_map_precharge_memlock(pages))
 		return ERR_PTR(-EPERM);
 
 	storage = kmalloc_node(sizeof(struct bpf_cgroup_storage),
 			       __GFP_ZERO | GFP_USER, map->numa_node);
 	if (!storage) {
-		bpf_map_uncharge_memlock(map, pages);
+		
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -313,7 +313,7 @@ struct bpf_cgroup_storage *bpf_cgroup_storage_alloc(struct bpf_prog *prog,
 				    map->value_size, __GFP_ZERO | GFP_USER,
 				    map->numa_node);
 	if (!storage->buf) {
-		bpf_map_uncharge_memlock(map, pages);
+		
 		kfree(storage);
 		return ERR_PTR(-ENOMEM);
 	}
@@ -335,7 +335,7 @@ void bpf_cgroup_storage_free(struct bpf_cgroup_storage *storage)
 	pages = round_up(sizeof(struct bpf_cgroup_storage) +
 			 sizeof(struct bpf_storage_buffer) +
 			 map->value_size, PAGE_SIZE) >> PAGE_SHIFT;
-	bpf_map_uncharge_memlock(map, pages);
+	
 
 	kfree_rcu(storage->buf, rcu);
 	kfree_rcu(storage, rcu);

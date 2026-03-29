@@ -13,6 +13,7 @@
 
 #include <net/flow.h>
 #include <net/netns/core.h>
+#include <net/netns/bpf.h>
 #include <net/netns/mib.h>
 #include <net/netns/unix.h>
 #include <net/netns/packet.h>
@@ -93,6 +94,7 @@ struct net {
 	struct list_head	fib_notifier_ops;  /* protected by net_mutex */
 
 	struct net_device       *loopback_dev;          /* The loopback */
+	struct netns_bpf	bpf;
 	struct netns_core	core;
 	struct netns_mib	mib;
 	struct netns_packet	packet;

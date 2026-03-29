@@ -1318,8 +1318,6 @@ cg_sockopt_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 {
 	switch (func_id) {
 #ifdef CONFIG_INET
-	case BPF_FUNC_tcp_sock:
-		return &bpf_tcp_sock_proto;
 #endif
 	default:
 		return cgroup_base_func_proto(func_id, prog);

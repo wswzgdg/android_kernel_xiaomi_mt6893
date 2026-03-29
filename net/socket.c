@@ -1861,15 +1861,9 @@ static int __sys_setsockopt(int fd, int level, int optname,
 		err = BPF_CGROUP_RUN_PROG_SETSOCKOPT(sock->sk, &level,
 						     &optname, optval, &optlen,
 						     &kernel_optval);
-<<<<<<< HEAD
 
 		if (err < 0) {
 			goto out_put;
-=======
-		if (err < 0) {
-			goto out_put;
-
->>>>>>> dd05ab5efc38 (bpf: implement getsockopt and setsockopt hooks)
 		} else if (err > 0) {
 			err = 0;
 			goto out_put;
@@ -1893,10 +1887,6 @@ static int __sys_setsockopt(int fd, int level, int optname,
 			set_fs(oldfs);
 			kfree(kernel_optval);
 		}
-<<<<<<< HEAD
-=======
-
->>>>>>> dd05ab5efc38 (bpf: implement getsockopt and setsockopt hooks)
 out_put:
 		fput_light(sock->file, fput_needed);
 	}
@@ -1941,10 +1931,7 @@ static int __sys_getsockopt(int fd, int level, int optname,
 		err = BPF_CGROUP_RUN_PROG_GETSOCKOPT(sock->sk, level, optname,
 						     optval, optlen,
 						     max_optlen, err);
-<<<<<<< HEAD
-=======
 
->>>>>>> dd05ab5efc38 (bpf: implement getsockopt and setsockopt hooks)
 out_put:
 		fput_light(sock->file, fput_needed);
 	}

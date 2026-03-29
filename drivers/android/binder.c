@@ -205,7 +205,7 @@ enum binder_stat_types {
 };
 
 struct binder_stats {
-	atomic_t br[_IOC_NR(BR_FAILED_REPLY) + 1];
+	atomic_t br[_IOC_NR(BR_TRANSACTION_PENDING_FROZEN) + 1];
 	atomic_t bc[_IOC_NR(BC_REPLY_SG) + 1];
 	atomic_t obj_created[BINDER_STAT_COUNT];
 	atomic_t obj_deleted[BINDER_STAT_COUNT];
@@ -565,6 +565,12 @@ struct binder_proc {
 	int requested_threads;
 	int requested_threads_started;
 	int tmp_ref;
+	bool is_frozen;
+	bool sync_recv;
+	bool async_recv;
+	bool oneway_spam_detection_enabled;
+	int outstanding_txns;
+	wait_queue_head_t freeze_wait;
 	struct binder_priority default_priority;
 	struct dentry *debugfs_entry;
 	struct binder_alloc alloc;
@@ -1599,6 +1605,8 @@ static bool binder_has_work_ilocked(struct binder_thread *thread,
 		 !binder_worklist_empty_ilocked(&thread->proc->todo));
 }
 
+static void binder_proc_dec_tmpref(struct binder_proc *proc);
+
 static bool binder_has_work(struct binder_thread *thread, bool do_proc_work)
 {
 	bool has_work;
@@ -1715,6 +1723,85 @@ static void binder_wakeup_proc_ilocked(struct binder_proc *proc)
 	struct binder_thread *thread = binder_select_thread_ilocked(proc);
 
 	binder_wakeup_thread_ilocked(proc, thread, /* sync = */false);
+}
+
+static bool binder_txns_pending_ilocked(struct binder_proc *proc)
+{
+	return !list_empty(&proc->todo);
+}
+
+static struct binder_proc *binder_find_proc_by_pid(u32 pid)
+{
+	struct binder_proc *proc;
+
+	mutex_lock(&binder_procs_lock);
+	hlist_for_each_entry(proc, &binder_procs, proc_node) {
+		if (proc->pid == pid) {
+			proc->tmp_ref++;
+			mutex_unlock(&binder_procs_lock);
+			return proc;
+		}
+	}
+	mutex_unlock(&binder_procs_lock);
+	return NULL;
+}
+
+static int binder_ioctl_freeze(struct binder_freeze_info *info)
+{
+	struct binder_proc *target_proc;
+	int ret = 0;
+
+	target_proc = binder_find_proc_by_pid(info->pid);
+	if (!target_proc)
+		return -EINVAL;
+
+	binder_inner_proc_lock(target_proc);
+	target_proc->sync_recv = false;
+	target_proc->async_recv = false;
+	target_proc->is_frozen = !!info->enable;
+	binder_inner_proc_unlock(target_proc);
+
+	if (info->enable && info->timeout_ms > 0) {
+		ret = wait_event_interruptible_timeout(target_proc->freeze_wait,
+			!READ_ONCE(target_proc->outstanding_txns),
+			msecs_to_jiffies(info->timeout_ms));
+		if (ret > 0)
+			ret = 0;
+		else if (ret == 0)
+			ret = -EAGAIN;
+		if (!ret) {
+			binder_inner_proc_lock(target_proc);
+			if (binder_txns_pending_ilocked(target_proc))
+				ret = -EAGAIN;
+			binder_inner_proc_unlock(target_proc);
+		}
+		if (ret < 0) {
+			binder_inner_proc_lock(target_proc);
+			target_proc->is_frozen = false;
+			binder_inner_proc_unlock(target_proc);
+		}
+	}
+
+	binder_proc_dec_tmpref(target_proc);
+	return ret;
+}
+
+static int binder_ioctl_get_frozen_info(struct binder_frozen_status_info *info)
+{
+	struct binder_proc *target_proc;
+
+	target_proc = binder_find_proc_by_pid(info->pid);
+	if (!target_proc)
+		return -EINVAL;
+
+	binder_inner_proc_lock(target_proc);
+	info->sync_recv = target_proc->sync_recv |
+				  (binder_txns_pending_ilocked(target_proc) ? 2 : 0);
+	info->async_recv = target_proc->async_recv;
+	binder_inner_proc_unlock(target_proc);
+
+	binder_proc_dec_tmpref(target_proc);
+	return 0;
 }
 
 static bool is_rt_policy(int policy)
@@ -2717,6 +2804,10 @@ static void binder_free_transaction(struct binder_transaction *t)
 		binder_inner_proc_lock(target_proc);
 		if (t->buffer)
 			t->buffer->transaction = NULL;
+		if (target_proc->outstanding_txns > 0)
+			target_proc->outstanding_txns--;
+		if (!target_proc->outstanding_txns && target_proc->is_frozen)
+			wake_up_interruptible_all(&target_proc->freeze_wait);
 		binder_inner_proc_unlock(target_proc);
 	}
 #ifdef BINDER_WATCHDOG
@@ -3766,15 +3857,24 @@ static void binder_transaction(struct binder_proc *proc,
 			return_error_line = __LINE__;
 			goto err_invalid_target_handle;
 		}
-		if (security_binder_transaction(proc->tsk,
-						target_proc->tsk) < 0) {
-		if (security_binder_transaction(proc->cred,
-						target_proc->cred) < 0) {
+			if (security_binder_transaction(proc->cred,
+							target_proc->cred) < 0) {
 			return_error = BR_FAILED_REPLY;
 			return_error_param = -EPERM;
 			return_error_line = __LINE__;
 			goto err_invalid_target_handle;
 		}
+		binder_inner_proc_lock(target_proc);
+		if (target_proc->is_frozen) {
+			target_proc->sync_recv |= !(tr->flags & TF_ONE_WAY);
+			target_proc->async_recv |= !!(tr->flags & TF_ONE_WAY);
+			binder_inner_proc_unlock(target_proc);
+			return_error = (tr->flags & TF_ONE_WAY) ? BR_TRANSACTION_PENDING_FROZEN : BR_FROZEN_REPLY;
+			return_error_line = __LINE__;
+			goto err_dead_binder;
+		}
+		target_proc->outstanding_txns++;
+		binder_inner_proc_unlock(target_proc);
 		binder_inner_proc_lock(proc);
 		if (!(tr->flags & TF_ONE_WAY) && thread->transaction_stack) {
 			struct binder_transaction *tmp;
@@ -5536,12 +5636,12 @@ static int binder_thread_release(struct binder_proc *proc,
 	 * poll data structures holding it.
 	 */
 	if (thread->looper & BINDER_LOOPER_STATE_POLL)
-		wake_up_pollfree(&thread->wait);
+		wake_up_poll(&thread->wait, POLLHUP | POLLFREE);
 
 	binder_inner_proc_unlock(thread->proc);
 
 	/*
-	 * This is needed to avoid races between wake_up_pollfree() above and
+	 * This is needed to avoid races between wake_up_poll(..., POLLHUP | POLLFREE) above and
 	 * someone else removing the last entry from the queue for other reasons
 	 * (e.g. ep_remove_wait_queue() being called due to an epoll file
 	 * descriptor being closed).  Such other users hold an RCU read lock, so
@@ -5875,6 +5975,46 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		}
 		break;
 	}
+	case BINDER_FREEZE: {
+		struct binder_freeze_info info;
+
+		if (copy_from_user(&info, ubuf, sizeof(info))) {
+			ret = -EFAULT;
+			goto err;
+		}
+		ret = binder_ioctl_freeze(&info);
+		if (ret < 0)
+			goto err;
+		break;
+	}
+	case BINDER_GET_FROZEN_INFO: {
+		struct binder_frozen_status_info info;
+
+		if (copy_from_user(&info, ubuf, sizeof(info))) {
+			ret = -EFAULT;
+			goto err;
+		}
+		ret = binder_ioctl_get_frozen_info(&info);
+		if (ret < 0)
+			goto err;
+		if (copy_to_user(ubuf, &info, sizeof(info))) {
+			ret = -EFAULT;
+			goto err;
+		}
+		break;
+	}
+	case BINDER_ENABLE_ONEWAY_SPAM_DETECTION: {
+		__u32 enable;
+
+		if (copy_from_user(&enable, ubuf, sizeof(enable))) {
+			ret = -EFAULT;
+			goto err;
+		}
+		binder_inner_proc_lock(proc);
+		proc->oneway_spam_detection_enabled = !!enable;
+		binder_inner_proc_unlock(proc);
+		break;
+	}
 	default:
 		ret = -EINVAL;
 		goto err;
@@ -5989,6 +6129,7 @@ static int binder_open(struct inode *nodp, struct file *filp)
 	mutex_init(&proc->files_lock);
 	proc->cred = get_cred(filp->f_cred);
 	INIT_LIST_HEAD(&proc->todo);
+	init_waitqueue_head(&proc->freeze_wait);
 	if (binder_supported_policy(current->policy)) {
 		proc->default_priority.sched_policy = current->policy;
 		proc->default_priority.prio = current->normal_prio;
@@ -6589,7 +6730,10 @@ static const char * const binder_return_strings[] = {
 	"BR_FINISHED",
 	"BR_DEAD_BINDER",
 	"BR_CLEAR_DEATH_NOTIFICATION_DONE",
-	"BR_FAILED_REPLY"
+	"BR_FAILED_REPLY",
+	"BR_FROZEN_REPLY",
+	"",
+	"BR_TRANSACTION_PENDING_FROZEN"
 };
 
 static const char * const binder_command_strings[] = {

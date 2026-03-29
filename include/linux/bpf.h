@@ -20,6 +20,8 @@
 struct perf_event;
 struct bpf_prog;
 struct bpf_map;
+struct net_device;
+struct seq_file;
 
 /* map is generic key/value storage optionally accesible by eBPF programs */
 struct bpf_map_ops {
@@ -39,11 +41,7 @@ struct bpf_map_ops {
 	/* funcs called by prog_array and perf_event_array map */
 	void *(*map_fd_get_ptr)(struct bpf_map *map, struct file *map_file,
 				int fd);
-	/* If need_defer is true, the implementation should guarantee that
-	 * the to-be-put element is still alive before the bpf program, which
-	 * may manipulate it, exists.
-	 */
-	void (*map_fd_put_ptr)(struct bpf_map *map, void *ptr, bool need_defer);
+		void (*map_fd_put_ptr)(void *ptr);
 	u32 (*map_gen_lookup)(struct bpf_map *map, struct bpf_insn *insn_buf);
 	u32 (*map_fd_sys_lookup_elem)(void *ptr);
 };
@@ -78,6 +76,18 @@ struct bpf_map {
 	char name[BPF_OBJ_NAME_LEN];
 };
 
+static inline void bpf_map_init_from_attr(struct bpf_map *map,
+					 union bpf_attr *attr)
+{
+	map->map_type = attr->map_type;
+	map->key_size = attr->key_size;
+	map->value_size = attr->value_size;
+	map->max_entries = attr->max_entries;
+	map->map_flags = attr->map_flags;
+	map->numa_node = (attr->map_flags & BPF_F_NUMA_NODE) ?
+		attr->numa_node : NUMA_NO_NODE;
+}
+
 /* function argument constraints */
 enum bpf_arg_type {
 	ARG_DONTCARE = 0,	/* unused argument in helper function */
@@ -102,6 +112,7 @@ enum bpf_arg_type {
 	ARG_CONST_SIZE_OR_ZERO,	/* number of bytes accessed from memory or 0 */
 
 	ARG_PTR_TO_CTX,		/* pointer to context */
+	ARG_PTR_TO_SOCKET,	/* pointer to struct sock */
 	ARG_ANYTHING,		/* any (initialized) argument is ok */
 };
 
@@ -110,6 +121,7 @@ enum bpf_return_type {
 	RET_INTEGER,			/* function returns integer */
 	RET_VOID,			/* function doesn't return anything */
 	RET_PTR_TO_MAP_VALUE_OR_NULL,	/* returns a pointer to map elem value or NULL */
+	RET_PTR_TO_SOCKET_OR_NULL,	/* returns a pointer to struct sock or NULL */
 };
 
 /* eBPF function prototype used by verifier to allow BPF_CALLs from eBPF programs
@@ -394,6 +406,41 @@ extern int sysctl_unprivileged_bpf_disabled;
 int bpf_map_new_fd(struct bpf_map *map, int flags);
 int bpf_prog_new_fd(struct bpf_prog *prog);
 
+struct bpf_link;
+
+struct bpf_link_ops {
+	void (*release)(struct bpf_link *link);
+	void (*dealloc)(struct bpf_link *link);
+	int (*update_prog)(struct bpf_link *link, struct bpf_prog *new_prog,
+			   struct bpf_prog *old_prog);
+	int (*fill_link_info)(const struct bpf_link *link,
+			      struct bpf_link_info *info);
+	void (*show_fdinfo)(const struct bpf_link *link, struct seq_file *seq);
+};
+
+struct bpf_link {
+	atomic_t refcnt;
+	u32 id;
+	enum bpf_link_type type;
+	const struct bpf_link_ops *ops;
+	struct bpf_prog *prog;
+	struct work_struct work;
+};
+
+struct bpf_link_primer {
+	struct bpf_link *link;
+	struct file *file;
+	int fd;
+	int id;
+};
+
+void bpf_link_init(struct bpf_link *link, enum bpf_link_type type,
+		   const struct bpf_link_ops *ops, struct bpf_prog *prog);
+void bpf_link_put(struct bpf_link *link);
+int bpf_link_prime(struct bpf_link *link, struct bpf_link_primer *primer);
+int bpf_link_settle(struct bpf_link_primer *primer);
+void bpf_link_cleanup(struct bpf_link_primer *primer);
+
 int bpf_obj_pin_user(u32 ufd, const char __user *pathname);
 int bpf_obj_get_user(const char __user *pathname, int flags);
 
@@ -437,8 +484,8 @@ int bpf_check(struct bpf_prog **fp, union bpf_attr *attr);
 struct bpf_prog *bpf_prog_get_type_path(const char *name, enum bpf_prog_type type);
 
 /* Map specifics */
-struct net_device  *__dev_map_lookup_elem(struct bpf_map *map, u32 key);
-struct net_device  *__dev_map_hash_lookup_elem(struct bpf_map *map, u32 key);
+struct net_device *__dev_map_lookup_elem(struct bpf_map *map, u32 key);
+struct net_device *__dev_map_hash_lookup_elem(struct bpf_map *map, u32 key);
 void __dev_map_insert_ctx(struct bpf_map *map, u32 index);
 void __dev_map_flush(struct bpf_map *map);
 
