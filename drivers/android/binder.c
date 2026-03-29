@@ -3754,11 +3754,8 @@ static void binder_transaction(struct binder_proc *proc,
 			return_error_line = __LINE__;
 			goto err_invalid_target_handle;
 		}
-<<<<<<< HEAD
 		if (security_binder_transaction(proc->tsk,
 						target_proc->tsk) < 0) {
-=======
->>>>>>> 84b795266910 (binder: use cred instead of task for selinux checks)
 		if (security_binder_transaction(proc->cred,
 						target_proc->cred) < 0) {
 			return_error = BR_FAILED_REPLY;
