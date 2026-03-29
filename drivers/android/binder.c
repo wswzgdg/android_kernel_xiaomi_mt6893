@@ -3745,8 +3745,6 @@ static void binder_transaction(struct binder_proc *proc,
 			goto err_dead_binder;
 		}
 		e->to_node = target_node->debug_id;
-<<<<<<< HEAD
-<<<<<<< HEAD
 #ifdef BINDER_WATCHDOG
 		strncpy(e->service, target_node->name, MAX_SERVICE_NAME_LEN);
 #endif
@@ -3756,14 +3754,10 @@ static void binder_transaction(struct binder_proc *proc,
 			return_error_line = __LINE__;
 			goto err_invalid_target_handle;
 		}
-=======
->>>>>>> 5206f78a3ffe (Revert "binder: Prevent context manager from incrementing ref 0")
 		if (security_binder_transaction(proc->tsk,
 						target_proc->tsk) < 0) {
-=======
 		if (security_binder_transaction(proc->cred,
 						target_proc->cred) < 0) {
->>>>>>> 9693ca7b5262 (BACKPORT: binder: use cred instead of task for selinux checks)
 			return_error = BR_FAILED_REPLY;
 			return_error_param = -EPERM;
 			return_error_line = __LINE__;
