@@ -141,6 +141,42 @@ static char *extra_command_line;
 #define BOOTCONFIG_MAGIC_LEN 12
 #define BOOTCONFIG_MAX_SIZE (32 * 1024)
 
+static bool __init bootconfig_requested(void)
+{
+	char *p = boot_command_line;
+	size_t len = strlen("bootconfig");
+
+	while ((p = strstr(p, "bootconfig")) != NULL) {
+		if ((p == boot_command_line || isspace(p[-1])) &&
+		    (p[len] == '\0' || isspace(p[len])))
+			return true;
+		p += len;
+	}
+	return false;
+}
+
+static void __init remove_bootconfig_token(char *cmdline)
+{
+	char *p;
+	size_t len = strlen("bootconfig");
+
+	while ((p = strstr(cmdline, "bootconfig")) != NULL) {
+		char *end = p + len;
+
+		if ((p != cmdline && !isspace(p[-1])) ||
+		    (*end != '\0' && !isspace(*end))) {
+			cmdline = end;
+			continue;
+		}
+		if (*end == ' ')
+			end++;
+		if (p != cmdline && p[-1] == ' ')
+			p--;
+		memmove(p, end, strlen(end) + 1);
+		return;
+	}
+}
+
 static u32 __init bootconfig_checksum(const u8 *data, size_t size)
 {
 	u32 sum = 0;
@@ -156,35 +192,42 @@ static void __init setup_boot_config(void)
 	char *magic;
 	u32 size, csum;
 	u8 *data;
+	int i;
 
 	if (!initrd_start || !initrd_end || initrd_end <= initrd_start)
 		return;
-	if (!strstr(boot_command_line, "bootconfig"))
+	if (!bootconfig_requested())
 		return;
 	if (initrd_end - initrd_start < BOOTCONFIG_MAGIC_LEN + 8)
 		return;
 
-	magic = (char *)(initrd_end - BOOTCONFIG_MAGIC_LEN);
-	if (memcmp(magic, BOOTCONFIG_MAGIC, BOOTCONFIG_MAGIC_LEN))
-		return;
+	for (i = 0; i < 4; i++) {
+		magic = (char *)(initrd_end - BOOTCONFIG_MAGIC_LEN - i);
+		if ((unsigned long)magic < initrd_start + 8)
+			break;
+		if (memcmp(magic, BOOTCONFIG_MAGIC, BOOTCONFIG_MAGIC_LEN))
+			continue;
 
-	memcpy(&size, magic - 8, 4);
-	memcpy(&csum, magic - 4, 4);
-	if (!size || size > BOOTCONFIG_MAX_SIZE)
-		return;
-	if (initrd_end - initrd_start < BOOTCONFIG_MAGIC_LEN + 8 + size)
-		return;
+		memcpy(&size, magic - 8, 4);
+		memcpy(&csum, magic - 4, 4);
+		if (!size || size > BOOTCONFIG_MAX_SIZE)
+			continue;
+		if (magic - 8 - size < (char *)initrd_start)
+			continue;
 
-	data = (u8 *)(magic - 8 - size);
-	if (bootconfig_checksum(data, size) != csum)
-		return;
+		data = (u8 *)(magic - 8 - size);
+		if (bootconfig_checksum(data, size) != csum)
+			continue;
 
-	extra_command_line = memblock_virt_alloc(size + 2, 0);
-	memcpy(extra_command_line, data, size);
-	extra_command_line[size] = ' ';
-	extra_command_line[size + 1] = '\0';
-	initrd_end = (unsigned long)data;
-	pr_info("bootconfig: appended %u bytes from initrd tail\n", size);
+		extra_command_line = memblock_virt_alloc(size + 2, 0);
+		memcpy(extra_command_line, data, size);
+		extra_command_line[size] = ' ';
+		extra_command_line[size + 1] = '\0';
+		remove_bootconfig_token(boot_command_line);
+		initrd_end = (unsigned long)data;
+		pr_info("bootconfig: appended %u bytes from initrd tail\n", size);
+		return;
+	}
 }
 
 static char *execute_command;
