@@ -22,6 +22,8 @@ struct bpf_prog;
 struct bpf_map;
 struct net_device;
 struct seq_file;
+struct vm_area_struct;
+struct poll_table_struct;
 
 /* map is generic key/value storage optionally accesible by eBPF programs */
 struct bpf_map_ops {
@@ -32,6 +34,9 @@ struct bpf_map_ops {
 	int (*map_get_next_key)(struct bpf_map *map, void *key, void *next_key);
 	void (*map_release_uref)(struct bpf_map *map);
 	void *(*map_lookup_elem_sys_only)(struct bpf_map *map, void *key);
+	int (*map_mmap)(struct bpf_map *map, struct vm_area_struct *vma);
+	unsigned int (*map_poll)(struct bpf_map *map, struct file *filp,
+			 struct poll_table_struct *pts);
 
 	/* funcs callable from userspace and from eBPF programs */
 	void *(*map_lookup_elem)(struct bpf_map *map, void *key);
@@ -91,6 +96,8 @@ static inline void bpf_map_init_from_attr(struct bpf_map *map,
 /* function argument constraints */
 enum bpf_arg_type {
 	ARG_DONTCARE = 0,	/* unused argument in helper function */
+	ARG_CONST_ALLOC_SIZE_OR_ZERO,
+	ARG_PTR_TO_ALLOC_MEM,
 
 	/* the following constraints used to prototype
 	 * bpf_map_lookup/update/delete_elem() functions
@@ -122,6 +129,7 @@ enum bpf_return_type {
 	RET_VOID,			/* function doesn't return anything */
 	RET_PTR_TO_MAP_VALUE_OR_NULL,	/* returns a pointer to map elem value or NULL */
 	RET_PTR_TO_SOCKET_OR_NULL,	/* returns a pointer to struct sock or NULL */
+	RET_PTR_TO_ALLOC_MEM_OR_NULL,
 };
 
 /* eBPF function prototype used by verifier to allow BPF_CALLs from eBPF programs
@@ -401,6 +409,16 @@ int bpf_map_precharge_memlock(u32 pages);
 void *bpf_map_area_alloc(size_t size, int numa_node);
 void bpf_map_area_free(void *base);
 
+static inline int bpf_map_charge_init(struct bpf_map *map, u64 size)
+{
+	map->pages = round_up(size, PAGE_SIZE) >> PAGE_SHIFT;
+	return bpf_map_precharge_memlock(map->pages);
+}
+
+static inline void bpf_map_charge_finish(struct bpf_map *map)
+{
+}
+
 extern int sysctl_unprivileged_bpf_disabled;
 
 int bpf_map_new_fd(struct bpf_map *map, int flags);
@@ -651,6 +669,11 @@ extern const struct bpf_func_proto bpf_sock_map_update_proto;
 extern const struct bpf_func_proto bpf_get_current_cgroup_id_proto;
 extern const struct bpf_func_proto bpf_get_local_storage_proto;
 extern const struct bpf_func_proto bpf_tcp_sock_proto;
+extern const struct bpf_func_proto bpf_ringbuf_reserve_proto;
+extern const struct bpf_func_proto bpf_ringbuf_submit_proto;
+extern const struct bpf_func_proto bpf_ringbuf_discard_proto;
+extern const struct bpf_func_proto bpf_ringbuf_output_proto;
+extern const struct bpf_func_proto bpf_ringbuf_query_proto;
 
 /* Shared helpers among cBPF and eBPF. */
 void bpf_user_rnd_init_once(void);

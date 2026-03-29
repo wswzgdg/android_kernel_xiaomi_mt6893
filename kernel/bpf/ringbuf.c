@@ -48,7 +48,6 @@ struct bpf_ringbuf {
 
 struct bpf_ringbuf_map {
 	struct bpf_map map;
-	struct bpf_map_memory memory;
 	struct bpf_ringbuf *rb;
 };
 
@@ -176,7 +175,7 @@ static struct bpf_map *ringbuf_map_alloc(union bpf_attr *attr)
 	cost = sizeof(struct bpf_ringbuf_map) +
 	       sizeof(struct bpf_ringbuf) +
 	       attr->max_entries;
-	err = bpf_map_charge_init(&rb_map->map.memory, cost);
+	err = bpf_map_charge_init(&rb_map->map, cost);
 	if (err)
 		goto err_free_map;
 
@@ -189,7 +188,7 @@ static struct bpf_map *ringbuf_map_alloc(union bpf_attr *attr)
 	return &rb_map->map;
 
 err_uncharge:
-	bpf_map_charge_finish(&rb_map->map.memory);
+	bpf_map_charge_finish(&rb_map->map);
 err_free_map:
 	kfree(rb_map);
 	return ERR_PTR(err);
@@ -279,8 +278,8 @@ static unsigned long ringbuf_avail_data_sz(struct bpf_ringbuf *rb)
 	return prod_pos - cons_pos;
 }
 
-static __poll_t ringbuf_map_poll(struct bpf_map *map, struct file *filp,
-				 struct poll_table_struct *pts)
+static unsigned int ringbuf_map_poll(struct bpf_map *map, struct file *filp,
+				      struct poll_table_struct *pts)
 {
 	struct bpf_ringbuf_map *rb_map;
 
@@ -288,7 +287,7 @@ static __poll_t ringbuf_map_poll(struct bpf_map *map, struct file *filp,
 	poll_wait(filp, &rb_map->rb->waitq, pts);
 
 	if (ringbuf_avail_data_sz(rb_map->rb))
-		return EPOLLIN | EPOLLRDNORM;
+		return POLLIN | POLLRDNORM;
 	return 0;
 }
 
