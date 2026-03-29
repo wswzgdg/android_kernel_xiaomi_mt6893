@@ -736,9 +736,11 @@ __SYSCALL(__NR_statx,     sys_statx)
 __SYSCALL(__NR_pidfd_send_signal, sys_pidfd_send_signal)
 #define __NR_pidfd_open 434
 __SYSCALL(__NR_pidfd_open, sys_pidfd_open)
+#define __NR_process_mrelease 448
+__SYSCALL(__NR_process_mrelease, sys_process_mrelease)
 
 #undef __NR_syscalls
-#define __NR_syscalls 435
+#define __NR_syscalls (__NR_process_mrelease+1)
 
 /*
  * All syscalls below here should go away really,
@@ -899,7 +901,7 @@ __SYSCALL(__NR_fork, sys_ni_syscall)
 #endif /* CONFIG_MMU */
 
 #undef __NR_syscalls
-#define __NR_syscalls (__NR_fork+1)
+#define __NR_syscalls (__NR_process_mrelease+1)
 
 #endif /* __ARCH_WANT_SYSCALL_DEPRECATED */
 

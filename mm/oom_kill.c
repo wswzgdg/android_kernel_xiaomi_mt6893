@@ -40,6 +40,9 @@
 #include <linux/ratelimit.h>
 #include <linux/kthread.h>
 #include <linux/init.h>
+#include <linux/syscalls.h>
+#include <linux/file.h>
+#include <linux/proc_fs.h>
 #include <linux/mmu_notifier.h>
 
 #ifdef CONFIG_MTK_ION
@@ -1138,4 +1141,69 @@ void pagefault_out_of_memory(void)
 		return;
 	out_of_memory(&oc);
 	mutex_unlock(&oom_lock);
+}
+
+
+SYSCALL_DEFINE2(process_mrelease, int, pidfd, unsigned int, flags)
+{
+#ifdef CONFIG_MMU
+	struct mm_struct *mm = NULL;
+	struct task_struct *task;
+	struct task_struct *p;
+	struct fd f;
+	struct pid *pid;
+	long ret = 0;
+
+	if (flags)
+		return -EINVAL;
+
+	f = fdget(pidfd);
+	if (!f.file)
+		return -EBADF;
+
+	pid = tgid_pidfd_to_pid(f.file);
+	if (IS_ERR(pid)) {
+		ret = PTR_ERR(pid);
+		goto out_fd;
+	}
+
+	task = get_pid_task(pid, PIDTYPE_PID);
+	if (!task) {
+		ret = -ESRCH;
+		goto out_fd;
+	}
+
+	p = find_lock_task_mm(task);
+	if (!p) {
+		ret = -ESRCH;
+		goto out_task;
+	}
+
+	mm = p->mm;
+	mmgrab(mm);
+	set_bit(MMF_OOM_VICTIM, &mm->flags);
+
+	if (!task_will_free_mem(p)) {
+		if (!test_bit(MMF_OOM_SKIP, &mm->flags))
+			ret = -EINVAL;
+		task_unlock(p);
+		goto out_mm;
+	}
+	task_unlock(p);
+
+	down_read(&mm->mmap_sem);
+	if (!test_bit(MMF_OOM_SKIP, &mm->flags))
+		__oom_reap_task_mm(mm);
+	up_read(&mm->mmap_sem);
+
+out_mm:
+	mmdrop(mm);
+out_task:
+	put_task_struct(task);
+out_fd:
+	fdput(f);
+	return ret;
+#else
+	return -ENOSYS;
+#endif
 }
