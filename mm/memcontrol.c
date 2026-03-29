@@ -5359,6 +5359,27 @@ static ssize_t memory_max_write(struct kernfs_open_file *of,
 	return nbytes;
 }
 
+static ssize_t memory_reclaim_write(struct kernfs_open_file *of,
+				    char *buf, size_t nbytes, loff_t off)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(of_css(of));
+	unsigned long nr_pages;
+	int err;
+
+	buf = strstrip(buf);
+	err = page_counter_memparse(buf, "max", &nr_pages);
+	if (err)
+		return err;
+
+	if (signal_pending(current))
+		return -EINTR;
+
+	drain_all_stock(memcg);
+	try_to_free_mem_cgroup_pages(memcg, nr_pages, GFP_KERNEL, true);
+
+	return nbytes;
+}
+
 static int memory_events_show(struct seq_file *m, void *v)
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
@@ -5483,6 +5504,11 @@ static struct cftype memory_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.file_offset = offsetof(struct mem_cgroup, events_file),
 		.seq_show = memory_events_show,
+	},
+	{
+		.name = "reclaim",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.write = memory_reclaim_write,
 	},
 	{
 		.name = "stat",
