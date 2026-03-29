@@ -19,6 +19,7 @@
 #include <linux/mmzone.h>
 #include <linux/anon_inodes.h>
 #include <linux/file.h>
+#include <linux/poll.h>
 #include <linux/license.h>
 #include <linux/filter.h>
 #include <linux/version.h>
@@ -320,6 +321,24 @@ static ssize_t bpf_dummy_write(struct file *filp, const char __user *buf,
 	return -EINVAL;
 }
 
+static int bpf_map_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	struct bpf_map *map = filp->private_data;
+
+	if (!map->ops->map_mmap)
+		return -ENOTSUPP;
+	return map->ops->map_mmap(map, vma);
+}
+
+static unsigned int bpf_map_poll(struct file *filp, struct poll_table_struct *pts)
+{
+	struct bpf_map *map = filp->private_data;
+
+	if (!map->ops->map_poll)
+		return POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM;
+	return map->ops->map_poll(map, filp, pts);
+}
+
 const struct file_operations bpf_map_fops = {
 #ifdef CONFIG_PROC_FS
 	.show_fdinfo	= bpf_map_show_fdinfo,
@@ -327,6 +346,8 @@ const struct file_operations bpf_map_fops = {
 	.release	= bpf_map_release,
 	.read		= bpf_dummy_read,
 	.write		= bpf_dummy_write,
+	.mmap		= bpf_map_mmap,
+	.poll		= bpf_map_poll,
 };
 
 int bpf_map_new_fd(struct bpf_map *map, int flags)

@@ -88,6 +88,7 @@
 #include <linux/io.h>
 #include <linux/cache.h>
 #include <linux/rodata_test.h>
+#include <linux/memblock.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -134,6 +135,57 @@ char *saved_command_line;
 static char *static_command_line;
 /* Command line for per-initcall parameter parsing */
 static char *initcall_command_line;
+static char *extra_command_line;
+
+#define BOOTCONFIG_MAGIC "#BOOTCONFIG\n"
+#define BOOTCONFIG_MAGIC_LEN 12
+#define BOOTCONFIG_MAX_SIZE (32 * 1024)
+
+static u32 __init bootconfig_checksum(const u8 *data, size_t size)
+{
+	u32 sum = 0;
+	size_t i;
+
+	for (i = 0; i < size; i++)
+		sum += data[i];
+	return sum;
+}
+
+static void __init setup_boot_config(void)
+{
+	char *magic;
+	u32 size, csum;
+	u8 *data;
+
+	if (!initrd_start || !initrd_end || initrd_end <= initrd_start)
+		return;
+	if (!strstr(boot_command_line, "bootconfig"))
+		return;
+	if (initrd_end - initrd_start < BOOTCONFIG_MAGIC_LEN + 8)
+		return;
+
+	magic = (char *)(initrd_end - BOOTCONFIG_MAGIC_LEN);
+	if (memcmp(magic, BOOTCONFIG_MAGIC, BOOTCONFIG_MAGIC_LEN))
+		return;
+
+	memcpy(&size, magic - 8, 4);
+	memcpy(&csum, magic - 4, 4);
+	if (!size || size > BOOTCONFIG_MAX_SIZE)
+		return;
+	if (initrd_end - initrd_start < BOOTCONFIG_MAGIC_LEN + 8 + size)
+		return;
+
+	data = (u8 *)(magic - 8 - size);
+	if (bootconfig_checksum(data, size) != csum)
+		return;
+
+	extra_command_line = memblock_virt_alloc(size + 2, 0);
+	memcpy(extra_command_line, data, size);
+	extra_command_line[size] = ' ';
+	extra_command_line[size + 1] = '\0';
+	initrd_end = (unsigned long)data;
+	pr_info("bootconfig: appended %u bytes from initrd tail\n", size);
+}
 
 static char *execute_command;
 static char *ramdisk_execute_command;
@@ -370,13 +422,24 @@ static inline void smp_prepare_cpus(unsigned int maxcpus) { }
  */
 static void __init setup_command_line(char *command_line)
 {
-	saved_command_line =
-		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
-	initcall_command_line =
-		memblock_virt_alloc(strlen(boot_command_line) + 1, 0);
-	static_command_line = memblock_virt_alloc(strlen(command_line) + 1, 0);
-	strcpy(saved_command_line, boot_command_line);
-	strcpy(static_command_line, command_line);
+	size_t extra_len = extra_command_line ? strlen(extra_command_line) : 0;
+	size_t boot_len = strlen(boot_command_line);
+	size_t cmd_len = strlen(command_line);
+
+	saved_command_line = memblock_virt_alloc(extra_len + boot_len + 1, 0);
+	initcall_command_line = memblock_virt_alloc(extra_len + boot_len + 1, 0);
+	static_command_line = memblock_virt_alloc(extra_len + cmd_len + 1, 0);
+
+	if (extra_len) {
+		memcpy(saved_command_line, extra_command_line, extra_len);
+		strcpy(saved_command_line + extra_len, boot_command_line);
+		memcpy(static_command_line, extra_command_line, extra_len);
+		strcpy(static_command_line + extra_len, command_line);
+	} else {
+		strcpy(saved_command_line, boot_command_line);
+		strcpy(static_command_line, command_line);
+	}
+	strcpy(initcall_command_line, saved_command_line);
 }
 
 /*
@@ -567,6 +630,7 @@ asmlinkage __visible void __init start_kernel(void)
 	add_device_randomness(command_line, strlen(command_line));
 	boot_init_stack_canary();
 	mm_init_cpumask(&init_mm);
+	setup_boot_config();
 	setup_command_line(command_line);
 	setup_nr_cpu_ids();
 	setup_per_cpu_areas();

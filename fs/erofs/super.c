@@ -202,9 +202,9 @@ static int erofs_load_compr_cfgs(struct super_block *sb,
 	sbi->available_compr_algs = le16_to_cpu(dsb->u1.available_compr_algs);
 
 	if (sbi->available_compr_algs & ~Z_EROFS_ALL_COMPR_ALGS) {
-		erofs_err(sb, "try to load compressed fs with unsupported algorithms %x",
-			  sbi->available_compr_algs & ~Z_EROFS_ALL_COMPR_ALGS);
-		return -EINVAL;
+		erofs_info(sb, "ignoring unsupported compression algorithms %x",
+			   sbi->available_compr_algs & ~Z_EROFS_ALL_COMPR_ALGS);
+		sbi->available_compr_algs &= Z_EROFS_ALL_COMPR_ALGS;
 	}
 
 	offset = EROFS_SUPER_OFFSET + sbi->sb_size;
