@@ -515,7 +515,6 @@ static struct dentry *binderfs_create_dentry(struct dentry *parent,
 	return dentry;
 }
 
-<<<<<<< HEAD
 void binderfs_remove_file(struct dentry *dentry)
 {
 	struct inode *parent_inode;
@@ -534,12 +533,10 @@ void binderfs_remove_file(struct dentry *dentry)
 struct dentry *binderfs_create_file(struct dentry *parent, const char *name,
 				    const struct file_operations *fops,
 				    void *data)
-=======
 static struct dentry *binderfs_create_file(struct dentry *parent,
 					   const char *name,
 					   const struct file_operations *fops,
 					   void *data)
->>>>>>> a575fb297900 (UPSTREAM: binder: Add stats, state and transactions files)
 {
 	struct dentry *dentry;
 	struct inode *new_inode, *parent_inode;
@@ -605,7 +602,6 @@ out:
 	return dentry;
 }
 
-<<<<<<< HEAD
 static int binder_features_show(struct seq_file *m, void *unused)
 {
 	bool *feature = m->private;
@@ -643,11 +639,9 @@ static int init_binder_logs(struct super_block *sb)
 {
 	struct dentry *binder_logs_root_dir, *dentry, *proc_log_dir;
 	struct binderfs_info *info;
-=======
 static int init_binder_logs(struct super_block *sb)
 {
 	struct dentry *binder_logs_root_dir, *dentry;
->>>>>>> a575fb297900 (UPSTREAM: binder: Add stats, state and transactions files)
 	int ret = 0;
 
 	binder_logs_root_dir = binderfs_create_dir(sb->s_root,
@@ -673,7 +667,6 @@ static int init_binder_logs(struct super_block *sb)
 
 	dentry = binderfs_create_file(binder_logs_root_dir, "transactions",
 				      &binder_transactions_fops, NULL);
-<<<<<<< HEAD
 	if (IS_ERR(dentry)) {
 		ret = PTR_ERR(dentry);
 		goto out;
@@ -704,10 +697,8 @@ static int init_binder_logs(struct super_block *sb)
 	}
 	info = sb->s_fs_info;
 	info->proc_log_dir = proc_log_dir;
-=======
 	if (IS_ERR(dentry))
 		ret = PTR_ERR(dentry);
->>>>>>> a575fb297900 (UPSTREAM: binder: Add stats, state and transactions files)
 
 out:
 	return ret;
