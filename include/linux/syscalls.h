@@ -190,6 +190,7 @@ static inline int is_syscall_trace_event(struct trace_event_call *tp_event)
 #endif
 
 asmlinkage long sys_process_mrelease(int pidfd, unsigned int flags);
+asmlinkage long sys_pidfd_getfd(int pidfd, int fd, unsigned int flags);
 #define SYSCALL_DEFINE0(sname)					\
 	SYSCALL_METADATA(_##sname, 0);				\
 	asmlinkage long sys_##sname(void)

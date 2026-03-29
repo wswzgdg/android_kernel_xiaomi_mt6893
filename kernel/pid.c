@@ -39,6 +39,9 @@
 #include <linux/proc_ns.h>
 #include <linux/proc_fs.h>
 #include <linux/anon_inodes.h>
+#include <linux/file.h>
+#include <linux/fdtable.h>
+#include <linux/security.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/task.h>
 
@@ -637,6 +640,93 @@ SYSCALL_DEFINE2(pidfd_open, pid_t, pid, unsigned int, flags)
 	fd = ret ?: pidfd_create(p);
 	put_pid(p);
 	return fd;
+}
+
+static struct file *__pidfd_fget(struct task_struct *task, int fd)
+{
+	struct files_struct *files;
+	struct file *file;
+	int ret;
+
+	ret = mutex_lock_killable(&task->signal->cred_guard_mutex);
+	if (ret)
+		return ERR_PTR(ret);
+
+	if (!ptrace_may_access(task, PTRACE_MODE_ATTACH_REALCREDS)) {
+		mutex_unlock(&task->signal->cred_guard_mutex);
+		return ERR_PTR(-EPERM);
+	}
+
+	files = get_files_struct(task);
+	if (!files) {
+		mutex_unlock(&task->signal->cred_guard_mutex);
+		return ERR_PTR(-ESRCH);
+	}
+
+	rcu_read_lock();
+	file = fcheck_files(files, fd);
+	if (file)
+		get_file(file);
+	rcu_read_unlock();
+
+	put_files_struct(files);
+	mutex_unlock(&task->signal->cred_guard_mutex);
+
+	return file ?: ERR_PTR(-EBADF);
+}
+
+static int pidfd_getfd(struct pid *pid, int fd)
+{
+	struct task_struct *task;
+	struct file *file;
+	int ret;
+
+	task = get_pid_task(pid, PIDTYPE_PID);
+	if (!task)
+		return -ESRCH;
+
+	file = __pidfd_fget(task, fd);
+	put_task_struct(task);
+	if (IS_ERR(file))
+		return PTR_ERR(file);
+
+	ret = security_file_receive(file);
+	if (ret) {
+		fput(file);
+		return ret;
+	}
+
+	ret = get_unused_fd_flags(O_CLOEXEC);
+	if (ret < 0)
+		fput(file);
+	else
+		fd_install(ret, file);
+
+	return ret;
+}
+
+SYSCALL_DEFINE3(pidfd_getfd, int, pidfd, int, fd,
+		unsigned int, flags)
+{
+	struct pid *pid;
+	struct fd f;
+	int ret;
+
+	if (flags)
+		return -EINVAL;
+
+	f = fdget(pidfd);
+	if (!f.file)
+		return -EBADF;
+
+	pid = tgid_pidfd_to_pid(f.file);
+	if (IS_ERR(pid))
+		ret = PTR_ERR(pid);
+	else
+		ret = pidfd_getfd(pid, fd);
+
+	fdput(f);
+	return ret;
 }
 
 /*
