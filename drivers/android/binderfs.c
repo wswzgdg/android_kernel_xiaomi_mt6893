@@ -685,7 +685,6 @@ static int init_binder_logs(struct super_block *sb)
 				      "failed_transaction_log",
 				      &binder_transaction_log_fops,
 				      &binder_transaction_log_failed);
-<<<<<<< HEAD
 	if (IS_ERR(dentry)) {
 		ret = PTR_ERR(dentry);
 		goto out;
@@ -698,8 +697,6 @@ static int init_binder_logs(struct super_block *sb)
 	}
 	info = sb->s_fs_info;
 	info->proc_log_dir = proc_log_dir;
-=======
->>>>>>> 3741393c2db1 (UPSTREAM: binder: Make transaction_log available in binderfs)
 	if (IS_ERR(dentry))
 		ret = PTR_ERR(dentry);
 
