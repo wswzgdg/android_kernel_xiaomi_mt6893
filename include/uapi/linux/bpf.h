@@ -274,6 +274,7 @@ struct bpf_link_info {
 
 /* flags for BPF_PROG_QUERY */
 #define BPF_F_QUERY_EFFECTIVE	(1U << 0)
+#define BPF_F_REPLACE		(1U << 0)
 
 #define BPF_F_SYSCTL_BASE_NAME	(1U << 0)
 
@@ -360,6 +361,7 @@ union bpf_attr {
 			__u32		start_id;
 			__u32		prog_id;
 			__u32		map_id;
+			__u32		link_id;
 		};
 		__u32		next_id;
 		__u32		open_flags;
@@ -399,6 +401,13 @@ union bpf_attr {
 		__u32		attach_type;
 		__u32		flags;
 	} link_create;
+
+	struct { /* struct used by BPF_LINK_UPDATE command */
+		__u32		link_fd;
+		__u32		new_prog_fd;
+		__u32		flags;
+		__u32		old_prog_fd;
+	} link_update;
 } __attribute__((aligned(8)));
 
 /* BPF helper function descriptions:

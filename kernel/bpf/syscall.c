@@ -1595,6 +1595,69 @@ static int link_create(union bpf_attr *attr)
 	return ret;
 }
 
+#define BPF_LINK_UPDATE_LAST_FIELD link_update.old_prog_fd
+static int link_update(union bpf_attr *attr)
+{
+	struct bpf_prog *old_prog = NULL, *new_prog;
+	struct bpf_link *link;
+	struct fd f;
+	int ret;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (CHECK_ATTR(BPF_LINK_UPDATE))
+		return -EINVAL;
+
+	if (attr->link_update.flags & ~BPF_F_REPLACE)
+		return -EINVAL;
+
+	f = fdget(attr->link_update.link_fd);
+	if (!f.file)
+		return -EBADF;
+
+	ret = -EINVAL;
+	if (f.file->f_op != &bpf_link_fops)
+		goto out;
+
+	link = f.file->private_data;
+	if (!link->ops->update_prog)
+		goto out;
+
+	new_prog = bpf_prog_get(attr->link_update.new_prog_fd);
+	if (IS_ERR(new_prog)) {
+		ret = PTR_ERR(new_prog);
+		goto out;
+	}
+
+	if (attr->link_update.flags & BPF_F_REPLACE) {
+		old_prog = bpf_prog_get(attr->link_update.old_prog_fd);
+		if (IS_ERR(old_prog)) {
+			ret = PTR_ERR(old_prog);
+			old_prog = NULL;
+			goto out_put_new;
+		}
+	} else if (attr->link_update.old_prog_fd) {
+		ret = -EINVAL;
+		goto out_put_new;
+	}
+
+	ret = link->ops->update_prog(link, new_prog, old_prog);
+	if (old_prog)
+		bpf_prog_put(old_prog);
+	if (ret)
+		goto out_put_new;
+
+	fdput(f);
+	return 0;
+
+out_put_new:
+	bpf_prog_put(new_prog);
+out:
+	fdput(f);
+	return ret;
+}
+
 #ifdef CONFIG_CGROUP_BPF
 
 #define BPF_PROG_ATTACH_LAST_FIELD attach_flags
@@ -1952,6 +2015,38 @@ static int bpf_map_get_fd_by_id(const union bpf_attr *attr)
 	return fd;
 }
 
+#define BPF_LINK_GET_FD_BY_ID_LAST_FIELD link_id
+
+static int bpf_link_get_fd_by_id(const union bpf_attr *attr)
+{
+	struct bpf_link *link;
+	u32 id = attr->link_id;
+	int fd;
+
+	if (CHECK_ATTR(BPF_LINK_GET_FD_BY_ID) || attr->open_flags)
+		return -EINVAL;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	spin_lock_bh(&link_idr_lock);
+	link = idr_find(&link_idr, id);
+	if (link && atomic_inc_not_zero(&link->refcnt))
+		;
+	else
+		link = ERR_PTR(-ENOENT);
+	spin_unlock_bh(&link_idr_lock);
+
+	if (IS_ERR(link))
+		return PTR_ERR(link);
+
+	fd = anon_inode_getfd("bpf_link", &bpf_link_fops, link, O_CLOEXEC);
+	if (fd < 0)
+		bpf_link_put(link);
+
+	return fd;
+}
+
 static int bpf_prog_get_info_by_fd(struct bpf_prog *prog,
 				   const union bpf_attr *attr,
 				   union bpf_attr __user *uattr)
@@ -2048,6 +2143,37 @@ static int bpf_map_get_info_by_fd(struct bpf_map *map,
 	info.max_entries = map->max_entries;
 	info.map_flags = map->map_flags;
 	memcpy(info.name, map->name, sizeof(map->name));
+
+	if (copy_to_user(uinfo, &info, info_len) ||
+	    put_user(info_len, &uattr->info.info_len))
+		return -EFAULT;
+
+	return 0;
+}
+
+static int bpf_link_get_info_by_fd(struct bpf_link *link,
+				   const union bpf_attr *attr,
+				   union bpf_attr __user *uattr)
+{
+	struct bpf_link_info __user *uinfo = u64_to_user_ptr(attr->info.info);
+	struct bpf_link_info info;
+	u32 info_len = attr->info.info_len;
+	int err;
+
+	err = check_uarg_tail_zero(uinfo, sizeof(info), info_len);
+	if (err)
+		return err;
+	info_len = min_t(u32, sizeof(info), info_len);
+
+	memset(&info, 0, sizeof(info));
+	info.type = link->type;
+	info.id = link->id;
+	info.prog_id = link->prog->aux->id;
+	if (link->ops->fill_link_info) {
+		err = link->ops->fill_link_info(link, &info);
+		if (err)
+			return err;
+	}
 
 	if (copy_to_user(uinfo, &info, info_len) ||
 	    put_user(info_len, &uattr->info.info_len))
@@ -2183,6 +2309,16 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 		break;
 	case BPF_LINK_CREATE:
 		err = link_create(&attr);
+		break;
+	case BPF_LINK_UPDATE:
+		err = link_update(&attr);
+		break;
+	case BPF_LINK_GET_FD_BY_ID:
+		err = bpf_link_get_fd_by_id(&attr);
+		break;
+	case BPF_LINK_GET_NEXT_ID:
+		err = bpf_obj_get_next_id(&attr, uattr,
+					  &link_idr, &link_idr_lock);
 		break;
 	default:
 		err = -EINVAL;
