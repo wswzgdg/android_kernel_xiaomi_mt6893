@@ -527,6 +527,38 @@ int __weak bpf_stackmap_copy(struct bpf_map *map, void *key, void *value)
 /* last field in 'union bpf_attr' used by this command */
 #define BPF_MAP_LOOKUP_ELEM_LAST_FIELD value
 
+static int map_lookup_queue_stack_elem(struct bpf_map *map, void __user *uvalue,
+				      bool delete)
+{
+		void *value;
+		u32 value_size = map->value_size;
+		int err;
+
+		value = kmalloc(value_size, GFP_USER | __GFP_NOWARN);
+		if (!value)
+			return -ENOMEM;
+
+		rcu_read_lock();
+		if (map->map_type == BPF_MAP_TYPE_QUEUE)
+			err = delete ? bpf_queue_map_pop_elem(map, value) :
+				      bpf_queue_map_peek_elem(map, value);
+		else
+			err = delete ? bpf_stack_map_pop_elem(map, value) :
+				      bpf_stack_map_peek_elem(map, value);
+		rcu_read_unlock();
+		if (err)
+			goto out_free;
+
+		err = -EFAULT;
+		if (copy_to_user(uvalue, value, value_size))
+			goto out_free;
+
+		err = 0;
+out_free:
+		kfree(value);
+		return err;
+}
+
 static int map_lookup_elem(union bpf_attr *attr)
 {
 	void __user *ukey = u64_to_user_ptr(attr->key);
@@ -555,6 +587,12 @@ static int map_lookup_elem(union bpf_attr *attr)
 	if (IS_ERR(key)) {
 		err = PTR_ERR(key);
 		goto err_put;
+	}
+
+	if (map->map_type == BPF_MAP_TYPE_QUEUE ||
+	    map->map_type == BPF_MAP_TYPE_STACK) {
+		err = map_lookup_queue_stack_elem(map, uvalue, false);
+		goto free_key;
 	}
 
 	if (map->map_type == BPF_MAP_TYPE_PERCPU_HASH ||
@@ -677,7 +715,12 @@ static int map_update_elem(union bpf_attr *attr)
 	 */
 	preempt_disable();
 	__this_cpu_inc(bpf_prog_active);
-	if (map->map_type == BPF_MAP_TYPE_PERCPU_HASH ||
+	if (map->map_type == BPF_MAP_TYPE_QUEUE ||
+	    map->map_type == BPF_MAP_TYPE_STACK) {
+		rcu_read_lock();
+		err = bpf_queue_stack_map_push_elem(map, value, attr->flags);
+		rcu_read_unlock();
+	} else if (map->map_type == BPF_MAP_TYPE_PERCPU_HASH ||
 	    map->map_type == BPF_MAP_TYPE_LRU_PERCPU_HASH) {
 		err = bpf_percpu_hash_update(map, key, value, attr->flags);
 	} else if (map->map_type == BPF_MAP_TYPE_PERCPU_ARRAY) {
@@ -736,6 +779,14 @@ static int map_delete_elem(union bpf_attr *attr)
 
 	if (!(f.file->f_mode & FMODE_CAN_WRITE)) {
 		err = -EPERM;
+		goto err_put;
+	}
+
+	if (map->map_type == BPF_MAP_TYPE_QUEUE ||
+	    map->map_type == BPF_MAP_TYPE_STACK) {
+		err = map_lookup_queue_stack_elem(map, u64_to_user_ptr(attr->value), true);
+		if (!err)
+			trace_bpf_map_delete_elem(map, ufd, NULL);
 		goto err_put;
 	}
 

@@ -406,6 +406,12 @@ extern int sysctl_unprivileged_bpf_disabled;
 int bpf_map_new_fd(struct bpf_map *map, int flags);
 int bpf_prog_new_fd(struct bpf_prog *prog);
 
+int bpf_queue_map_peek_elem(struct bpf_map *map, void *value);
+int bpf_stack_map_peek_elem(struct bpf_map *map, void *value);
+int bpf_queue_map_pop_elem(struct bpf_map *map, void *value);
+int bpf_stack_map_pop_elem(struct bpf_map *map, void *value);
+int bpf_queue_stack_map_push_elem(struct bpf_map *map, void *value, u64 flags);
+
 struct bpf_link;
 
 struct bpf_link_ops {

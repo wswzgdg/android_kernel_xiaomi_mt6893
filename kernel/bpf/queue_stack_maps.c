@@ -165,31 +165,31 @@ out:
 }
 
 /* Called from syscall or from eBPF program */
-static int queue_map_peek_elem(struct bpf_map *map, void *value)
+int bpf_queue_map_peek_elem(struct bpf_map *map, void *value)
 {
 	return __queue_map_get(map, value, false);
 }
 
 /* Called from syscall or from eBPF program */
-static int stack_map_peek_elem(struct bpf_map *map, void *value)
+int bpf_stack_map_peek_elem(struct bpf_map *map, void *value)
 {
 	return __stack_map_get(map, value, false);
 }
 
 /* Called from syscall or from eBPF program */
-static int queue_map_pop_elem(struct bpf_map *map, void *value)
+int bpf_queue_map_pop_elem(struct bpf_map *map, void *value)
 {
 	return __queue_map_get(map, value, true);
 }
 
 /* Called from syscall or from eBPF program */
-static int stack_map_pop_elem(struct bpf_map *map, void *value)
+int bpf_stack_map_pop_elem(struct bpf_map *map, void *value)
 {
 	return __stack_map_get(map, value, true);
 }
 
 /* Called from syscall or from eBPF program */
-static int queue_stack_map_push_elem(struct bpf_map *map, void *value,
+int bpf_queue_stack_map_push_elem(struct bpf_map *map, void *value,
 				     u64 flags)
 {
 	struct bpf_queue_stack *qs = bpf_queue_stack(map);
