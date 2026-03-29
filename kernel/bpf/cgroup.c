@@ -18,7 +18,6 @@
 #include <linux/bpf.h>
 #include <linux/bpf-cgroup.h>
 #include <net/sock.h>
-#include <net/bpf_sk_storage.h>
 
 DEFINE_STATIC_KEY_FALSE(cgroup_bpf_enabled_key);
 EXPORT_SYMBOL(cgroup_bpf_enabled_key);
@@ -372,12 +371,12 @@ int __cgroup_bpf_detach(struct cgroup *cgrp, struct bpf_prog *prog,
 {
 	struct list_head *progs = &cgrp->bpf.progs[type];
 	enum bpf_cgroup_storage_type stype;
-	u32 flags = cgrp->bpf.flags[type];
+	u32 saved_flags = cgrp->bpf.flags[type];
 	struct bpf_prog *old_prog = NULL;
 	struct bpf_prog_list *pl;
 	int err;
 
-	if (flags & BPF_F_ALLOW_MULTI) {
+	if (saved_flags & BPF_F_ALLOW_MULTI) {
 		if (!prog)
 			/* to detach MULTI prog the user has to specify valid FD
 			 * of the program to be detached
@@ -389,7 +388,7 @@ int __cgroup_bpf_detach(struct cgroup *cgrp, struct bpf_prog *prog,
 			return -ENOENT;
 	}
 
-	if (flags & BPF_F_ALLOW_MULTI) {
+	if (saved_flags & BPF_F_ALLOW_MULTI) {
 		/* find the prog and detach it */
 		list_for_each_entry(pl, progs, node) {
 			if (pl->prog != prog)
@@ -444,7 +443,7 @@ int __cgroup_bpf_query(struct cgroup *cgrp, const union bpf_attr *attr,
 	__u32 __user *prog_ids = u64_to_user_ptr(attr->query.prog_ids);
 	enum bpf_attach_type type = attr->query.attach_type;
 	struct list_head *progs = &cgrp->bpf.progs[type];
-	u32 flags = cgrp->bpf.flags[type];
+	u32 saved_flags = cgrp->bpf.flags[type];
 	int cnt, ret = 0, i;
 
 	if (attr->query.query_flags & BPF_F_QUERY_EFFECTIVE)
@@ -452,7 +451,7 @@ int __cgroup_bpf_query(struct cgroup *cgrp, const union bpf_attr *attr,
 	else
 		cnt = prog_list_length(progs);
 
-	if (copy_to_user(&uattr->query.attach_flags, &flags, sizeof(flags)))
+	if (copy_to_user(&uattr->query.attach_flags, &saved_flags, sizeof(saved_flags)))
 		return -EFAULT;
 	if (copy_to_user(&uattr->query.prog_cnt, &cnt, sizeof(cnt)))
 		return -EFAULT;
@@ -1079,7 +1078,7 @@ static ssize_t sysctl_cpy_dir(const struct ctl_dir *dir, char **bufp,
 	if (!ret)
 		return ret;
 
-	tmp_ret = strscpy(*bufp, /, *lenp);
+	tmp_ret = strscpy(*bufp, "/", *lenp);
 	if (tmp_ret < 0)
 		return tmp_ret;
 	*bufp += tmp_ret;
@@ -1136,11 +1135,11 @@ static int copy_sysctl_value(char *dst, size_t dst_len, char *src,
 	memcpy(dst, src, min(dst_len, src_len));
 
 	if (dst_len > src_len) {
-		memset(dst + src_len, ' ', dst_len - src_len);
+		memset(dst + src_len, '\0', dst_len - src_len);
 		return src_len;
 	}
 
-	dst[dst_len - 1] = ' ';
+	dst[dst_len - 1] = '\0';
 
 	return -E2BIG;
 }
@@ -1165,7 +1164,7 @@ BPF_CALL_3(bpf_sysctl_get_new_value, struct bpf_sysctl_kern *, ctx, char *, buf,
 {
 	if (!ctx->write) {
 		if (buf && buf_len)
-			memset(buf, ' ', buf_len);
+			memset(buf, '\0', buf_len);
 		return -EINVAL;
 	}
 	return copy_sysctl_value(buf, buf_len, ctx->new_val, ctx->new_len);
@@ -1318,10 +1317,6 @@ static const struct bpf_func_proto *
 cg_sockopt_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 {
 	switch (func_id) {
-	case BPF_FUNC_sk_storage_get:
-		return &bpf_sk_storage_get_proto;
-	case BPF_FUNC_sk_storage_delete:
-		return &bpf_sk_storage_delete_proto;
 #ifdef CONFIG_INET
 	case BPF_FUNC_tcp_sock:
 		return &bpf_tcp_sock_proto;
