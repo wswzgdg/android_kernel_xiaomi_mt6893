@@ -919,6 +919,24 @@ union bpf_attr {
  * function eBPF program intends to call
  */
 #define __BPF_ENUM_FN(x) BPF_FUNC_ ## x
+enum {
+	BPF_RB_NO_WAKEUP		= (1ULL << 0),
+	BPF_RB_FORCE_WAKEUP		= (1ULL << 1),
+};
+
+enum {
+	BPF_RB_AVAIL_DATA = 0,
+	BPF_RB_RING_SIZE = 1,
+	BPF_RB_CONS_POS = 2,
+	BPF_RB_PROD_POS = 3,
+};
+
+enum {
+	BPF_RINGBUF_BUSY_BIT		= (1U << 31),
+	BPF_RINGBUF_DISCARD_BIT		= (1U << 30),
+	BPF_RINGBUF_HDR_SZ		= 8,
+};
+
 enum bpf_func_id {
 	__BPF_FUNC_MAPPER(__BPF_ENUM_FN)
 	__BPF_FUNC_MAX_ID,
